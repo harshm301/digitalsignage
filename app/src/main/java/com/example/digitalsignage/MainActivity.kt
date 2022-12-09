@@ -2,11 +2,9 @@ package com.example.digitalsignage
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.app.AlertDialog
 import android.app.DownloadManager
-import android.content.BroadcastReceiver
-import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
+import android.content.*
 import android.content.pm.PackageManager
 import android.database.Cursor
 import android.net.Uri
@@ -14,12 +12,14 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.provider.Settings
+import android.text.Editable
 import android.transition.Scene
 import android.transition.Transition
 import android.transition.TransitionManager
 import android.util.Log
 import android.webkit.MimeTypeMap
 import android.webkit.URLUtil
+import android.widget.EditText
 import android.widget.MediaController
 import android.widget.Toast
 import androidx.annotation.RequiresApi
@@ -31,6 +31,7 @@ import com.example.digitalsignage.databinding.ActivityMainBinding
 import com.google.firebase.FirebaseApp
 import com.google.firebase.database.*
 import com.google.gson.annotations.SerializedName
+import io.paperdb.Paper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -38,6 +39,7 @@ import java.time.Instant
 import java.time.OffsetDateTime
 import java.util.*
 import kotlin.collections.set
+
 
 data class DataClass(
     @SerializedName("date")
@@ -71,6 +73,7 @@ class MainActivity : AppCompatActivity() {
     private var itemDownload = 0
     private var totalItems = 0
     private var uriHashMap: MutableMap<Long, UriMapper> = mutableMapOf()
+    private var ISFTU = "ISFTU"
     var timeSlotMap: MutableMap<Long, PlayMapper> = mutableMapOf<Long, PlayMapper>().toSortedMap()
     private lateinit var database: DatabaseReference
     private var slotAlreadyPassed = true
@@ -182,7 +185,48 @@ class MainActivity : AppCompatActivity() {
         FirebaseApp.initializeApp(this)
         hasPermissions(context = this, PERMISSIONS)
         database = FirebaseDatabase.getInstance().reference
-        setUpPlayer()
+        if(Paper.book().read(ISFTU,true) == true){
+            setUpDeviceId()
+       }else {
+            Paper.book().write(ISFTU,false)
+            setUpPlayer()
+        }
+
+    }
+
+    private fun setUpDeviceId() {
+        val alert: AlertDialog.Builder = AlertDialog.Builder(this)
+
+        alert.setTitle("Enter device id")
+        alert.setMessage("you can only set device id once")
+        alert.setCancelable(false)
+
+// Set an EditText view to get user input
+
+// Set an EditText view to get user input
+        val input = EditText(this)
+        alert.setView(input)
+
+        alert.setPositiveButton("Ok", DialogInterface.OnClickListener { dialog, whichButton ->
+            val value: Editable? = input.text
+            pushDeviceIdToFirebase(value.toString())
+            // Do something with value!
+        })
+
+        alert.setNegativeButton("Cancel",
+            DialogInterface.OnClickListener { dialog, whichButton ->
+                // Canceled.
+                finish()
+            })
+
+        alert.show()
+    }
+
+    private fun pushDeviceIdToFirebase(toString: String) {
+        val map = mapOf(
+            toString to ""
+        )
+        database.child("user").updateChildren(map)
     }
 
     private fun hasPermissions(context: Context?, permissions: Array<String>) {
