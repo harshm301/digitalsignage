@@ -74,6 +74,7 @@ class MainActivity : AppCompatActivity() {
     private var totalItems = 0
     private var uriHashMap: MutableMap<Long, UriMapper> = mutableMapOf()
     private var ISFTU = "ISFTU"
+    private var DeviceId = "DeviceId"
     var timeSlotMap: MutableMap<Long, PlayMapper> = mutableMapOf<Long, PlayMapper>().toSortedMap()
     private lateinit var database: DatabaseReference
     private var slotAlreadyPassed = true
@@ -185,10 +186,10 @@ class MainActivity : AppCompatActivity() {
         FirebaseApp.initializeApp(this)
         hasPermissions(context = this, PERMISSIONS)
         database = FirebaseDatabase.getInstance().reference
-        if(Paper.book().read(ISFTU,true) == true){
+        if (Paper.book().read(ISFTU, true) == true && Paper.book().contains(DeviceId).not()) {
             setUpDeviceId()
-       }else {
-            Paper.book().write(ISFTU,false)
+        } else {
+            Paper.book().write(ISFTU, false)
             setUpPlayer()
         }
 
@@ -196,7 +197,6 @@ class MainActivity : AppCompatActivity() {
 
     private fun setUpDeviceId() {
         val alert: AlertDialog.Builder = AlertDialog.Builder(this)
-
         alert.setTitle("Enter device id")
         alert.setMessage("you can only set device id once")
         alert.setCancelable(false)
@@ -226,6 +226,7 @@ class MainActivity : AppCompatActivity() {
         val map = mapOf(
             toString to ""
         )
+        Paper.book().write(DeviceId, toString)
         database.child("user").updateChildren(map)
     }
 
@@ -380,44 +381,47 @@ class MainActivity : AppCompatActivity() {
         cleanUpandReset()
         val android_id = Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID)
         Log.d("Android", "Android ID : " + android_id)
-        val data = database.child("user").child(android_id).child("campaigns")
-            .addValueEventListener(object : ValueEventListener {
-                @RequiresApi(Build.VERSION_CODES.O)
-                override fun onDataChange(snapshot: DataSnapshot) {
-                    cleanUpandReset()
-                    val dataClassList = mutableListOf<DataClass>()
-                    snapshot.children.forEach {
-                        val dataClass = it.getValue(DataClass::class.java)
-                        if (dataClass != null) {
-                            dataClassList.add(
-                                dataClass
-                            )
+        val deviceId = Paper.book().read<String>(DeviceId)
+        if (deviceId != null) {
+            database.child("user").child(deviceId).child("campaigns")
+                .addValueEventListener(object : ValueEventListener {
+                    @RequiresApi(Build.VERSION_CODES.O)
+                    override fun onDataChange(snapshot: DataSnapshot) {
+                        cleanUpandReset()
+                        val dataClassList = mutableListOf<DataClass>()
+                        snapshot.children.forEach {
+                            val dataClass = it.getValue(DataClass::class.java)
+                            if (dataClass != null) {
+                                dataClassList.add(
+                                    dataClass
+                                )
+                            }
                         }
-                    }
-                    if (dataClassList.isNotEmpty()) {
-                        isDownloaded = false
-                    }
-                    lifecycleScope.launch(Dispatchers.IO) {
-                        System.out.println("Barcode" + Date().toInstant())
-                        dataClassList.forEach { dataClass ->
-                            totalItems += dataClass.urls!!.size
-                            dataClass.urls.forEach {
-                                dataClass.startTime?.let { it1 ->
-                                    onDownload(
-                                        it.trim(),
-                                        it1,
-                                        dataClass.endTime!!
-                                    )
+                        if (dataClassList.isNotEmpty()) {
+                            isDownloaded = false
+                        }
+                        lifecycleScope.launch(Dispatchers.IO) {
+                            System.out.println("Barcode" + Date().toInstant())
+                            dataClassList.forEach { dataClass ->
+                                totalItems += dataClass.urls!!.size
+                                dataClass.urls.forEach {
+                                    dataClass.startTime?.let { it1 ->
+                                        onDownload(
+                                            it.trim(),
+                                            it1,
+                                            dataClass.endTime!!
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
-                }
 
-                override fun onCancelled(error: DatabaseError) {
-                    //will do later
-                }
-            })
+                    override fun onCancelled(error: DatabaseError) {
+                        //will do later
+                    }
+                })
+        }
 
 
     }

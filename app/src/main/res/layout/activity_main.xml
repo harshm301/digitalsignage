@@ -13,12 +13,12 @@
         android:visibility="gone"
         android:layout_height="match_parent" />
 
-
     <VideoView
         android:id="@+id/videoView"
         android:visibility="gone"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_centerVertical="true" />
+
 
 </androidx.constraintlayout.widget.ConstraintLayout>
