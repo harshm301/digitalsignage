@@ -42,7 +42,6 @@ import kotlin.collections.set
 
 class MainActivity : AppCompatActivity() {
     private lateinit var bindingActivity: ActivityMainBinding
-    private var isDownloaded = false
     var PERMISSION_ALL = 101
     private var itemDownload = 0
     private var totalItems = 0
@@ -153,6 +152,7 @@ class MainActivity : AppCompatActivity() {
                         defaultUriMapper[id] = uri
                     }
                     itemDownload++
+                    Toast.makeText(this,"${totalItems-itemDownload} more item to download",Toast.LENGTH_SHORT).show()
                     startPlaying()
                 }
             }
@@ -311,15 +311,16 @@ class MainActivity : AppCompatActivity() {
             } else {
                 bindingActivity.ImageView.setImageDrawable(resources.getDrawable(R.drawable.ic_launcher_background))
                 currentTimeStamp = Instant.now().toEpochMilli()
+                isDefaultBeingShown = false
                 startPlayingIdex(listFiles, 0)
             }
         }
     }
 
     private suspend fun showCampaigs(listFiles: MutableList<Uri>, i: Int) {
-        isCampaignBeignShown = true
         Log.d("Barcode", "sampaigs, ${i} ${listFiles}")
         if (i < listFiles.size && isCampaignBeignShown.not()) {
+            isCampaignBeignShown = true
             playImageorVideo(listFiles[i])
             isCampaignBeignShown = false
             showCampaigs(listFiles,i.inc())
@@ -384,27 +385,21 @@ class MainActivity : AppCompatActivity() {
                             val list = it.value as String
                             defaultList.add(list)
                         }
-                        if (dataClassList.isNotEmpty()) {
-                            isDownloaded = false
-                        }
                         lifecycleScope.launch(Dispatchers.IO) {
-                            println("Barcode" + Date().toInstant())
+                            println("Barcode" +  Date().toInstant())
                             dataClassList.forEach { dataClass ->
                                 totalItems += dataClass.urls!!.size + defaultList.size
                                 dataClass.urls.forEach {
-                                    dataClass.startTime?.let { it1 ->
-                                        onDownload(
-                                            it.trim(),
-                                            it1,
-                                            dataClass.endTime!!
-                                        )
-                                    }
-                                }
-                                defaultList.forEach {
-                                    onDownload(it, isDeafaultDownload = true)
+                                    onDownload(
+                                        it.trim(),
+                                        startTime = dataClass.startTime,
+                                        endTime = dataClass.endTime,
+                                    )
                                 }
                             }
-
+                            defaultList.forEach {
+                                onDownload(it, isDeafaultDownload = true)
+                            }
                         }
                     }
 
@@ -427,7 +422,6 @@ class MainActivity : AppCompatActivity() {
         }
         uriHashMap.clear()
         timeSlotMap.clear()
-
     }
 
 
