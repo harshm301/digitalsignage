@@ -328,14 +328,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     private suspend fun playImageorVideo(uri: Uri){
-        val transition: Transition = CircularRevealTransition()
+        //val transition: Transition = CircularRevealTransition()
         val fileExt = MimeTypeMap.getSingleton()
             .getExtensionFromMimeType(contentResolver.getType(uri))
         bindingActivity.run {
             if (fileExt == "mp4") {
                 // val File = File()
-                transition.addTarget(bindingActivity.videoView)
-                TransitionManager.beginDelayedTransition(bindingActivity.root, transition)
+                //transition.addTarget(bindingActivity.videoView)
+              //  TransitionManager.beginDelayedTransition(bindingActivity.root, transition)
                 ImageView.isVisible = false
                 videoView.isVisible = true
                 videoView.setVideoURI(uri)
@@ -348,8 +348,8 @@ class MainActivity : AppCompatActivity() {
                 delay(duration ?: 0)
                 retriever.release();
             } else {
-                transition.addTarget(bindingActivity.ImageView)
-                TransitionManager.beginDelayedTransition(bindingActivity.root, transition)
+               // transition.addTarget(bindingActivity.ImageView)
+                //TransitionManager.beginDelayedTransition(bindingActivity.root, transition)
                 videoView.isVisible = false
                 ImageView.isVisible = true
                 ImageView.setImageURI(uri)
