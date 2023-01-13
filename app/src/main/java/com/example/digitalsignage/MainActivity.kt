@@ -8,6 +8,7 @@ import android.content.*
 import android.content.pm.PackageManager
 import android.database.Cursor
 import android.media.MediaMetadataRetriever
+import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -31,7 +32,6 @@ import io.paperdb.Paper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.io.FileNotFoundException
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.util.*
@@ -337,6 +337,10 @@ class MainActivity : AppCompatActivity() {
                     val duration =
                         retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
                             ?.toLong()
+                    videoView.setOnErrorListener { mp, what, extra ->
+                        Log.d("video", "setOnErrorListener ")
+                        true
+                    }
                     delay(duration ?: 0)
                     retriever.release();
                 } else {
