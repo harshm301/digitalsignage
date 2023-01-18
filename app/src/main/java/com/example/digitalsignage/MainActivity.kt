@@ -31,6 +31,7 @@ import io.paperdb.Paper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.io.File
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.util.*
@@ -55,7 +56,6 @@ class MainActivity : AppCompatActivity() {
     private var campaignRefreshed = false
     private var isVideoPlaying = true
     private var isLocalDefaultImageisShown = false
-
 
     @RequiresApi(Build.VERSION_CODES.O)
     private var currentTimeStamp = Instant.now().toEpochMilli()
@@ -452,8 +452,11 @@ class MainActivity : AppCompatActivity() {
             defaultList.clear()
             val downloadFolder =
                 Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-            for (tempFile in downloadFolder.listFiles()) {
-                tempFile.delete()
+            if(downloadFolder.isDirectory){
+                val list = downloadFolder.list()
+                for(file in list){
+                    File(downloadFolder,file).delete()
+                }
             }
             uriHashMap.clear()
             timeSlotMap.clear()
