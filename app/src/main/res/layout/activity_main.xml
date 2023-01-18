@@ -11,7 +11,8 @@
     <androidx.appcompat.widget.AppCompatImageView
         android:id="@+id/ImageView"
         android:layout_width="match_parent"
-        android:visibility="gone"
+        android:visibility="visible"
+        android:src="@mipmap/ic_launcher"
         android:layout_height="match_parent" />
 
     <VideoView
