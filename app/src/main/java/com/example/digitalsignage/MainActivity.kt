@@ -12,6 +12,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
+import android.provider.ContactsContract
 import android.provider.Settings
 import android.text.Editable
 import android.util.Log
@@ -22,6 +23,7 @@ import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import androidx.core.net.toFile
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import com.example.digitalsignage.databinding.ActivityMainBinding
@@ -52,9 +54,9 @@ class MainActivity : AppCompatActivity() {
     private var defaultList = mutableListOf<String>()
     private var defaultUriMapper: MutableMap<Long, Uri?> = mutableMapOf()
     private var isDefaultBeingShown = false
-    private var isCampaignBeignShown = false
+    private var isDownloaded = false
     private var campaignRefreshed = false
-    private var isVideoPlaying = true
+    private var isVideoPlaying = false
     private var isLocalDefaultImageisShown = false
 
     @RequiresApi(Build.VERSION_CODES.O)
@@ -160,6 +162,7 @@ class MainActivity : AppCompatActivity() {
                             Toast.LENGTH_SHORT
                         ).show()
                         if (itemDownload == totalItems) {
+                            isDownloaded = true
                             startPlaying()
                         }
                     }
@@ -285,16 +288,15 @@ class MainActivity : AppCompatActivity() {
             }.toMutableList()
             Log.d("Barcode", "Calls Function one time only ${listFiles.size}")
             isLocalDefaultImageisShown = false
-            startPlayingIdex(listFiles)
+            if(isDownloaded) {
+                startPlayingIdex(listFiles)
+            }
         }
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
     private suspend fun startPlayingIdex(listFiles: MutableList<PlayMapper>) {
-        if(isLocalDefaultImageisShown.not()) {
-            if (listFiles.isEmpty()) {
-                showDefault()
-            }
+        if (isLocalDefaultImageisShown.not()) {
             currentTimeStamp = Instant.now().toEpochMilli()
             for (playMapper in listFiles) {
                 if (currentTimeStamp >= playMapper.startTime && playMapper.endTime >= currentTimeStamp) {
@@ -310,16 +312,17 @@ class MainActivity : AppCompatActivity() {
                     showDefault()
                 }
             }
-            startPlayingIdex(listFiles)
+            if (listFiles.isEmpty()){
+                showDefault()
+            }else {
+                startPlayingIdex(listFiles)
+            }
         }
-        //  if (index == listFiles.size) {
-
-        //   }
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
     private suspend fun showDefault() {
-        if (defaultUriMapper.values.isEmpty() || isLocalDefaultImageisShown) {
+        if (defaultUriMapper.values.isEmpty()) {
             return
         }
         val list = defaultUriMapper.values.toList()
@@ -352,31 +355,36 @@ class MainActivity : AppCompatActivity() {
                     // val File = File()
                     //transition.addTarget(bindingActivity.videoView)
                     //  TransitionManager.beginDelayedTransition(bindingActivity.root, transition)
-                    ImageView.isVisible = false
-                    videoView.isVisible = true
-                    videoView.setVideoURI(uri)
-                    isVideoPlaying = true
-                    videoView.start()
-                    videoView.setZOrderOnTop(true)
-                    val retriever = MediaMetadataRetriever();
-                    retriever.setDataSource(this@MainActivity, uri);
-                    val duration =
-                        retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
-                            ?.toLong()
-                    videoView.setOnErrorListener { mp, what, extra ->
-                        Log.d("video", "setOnErrorListener ")
+                    if (uri.toFile().exists()) {
+                        ImageView.isVisible = false
+                        videoView.isVisible = true
+                        videoView.setVideoURI(uri)
+                        isVideoPlaying = true
+                        videoView.start()
+                        videoView.setZOrderOnTop(true)
+                        val retriever = MediaMetadataRetriever();
+                        retriever.setDataSource(this@MainActivity, uri);
+                        val duration =
+                            retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                                ?.toLong()
+                        videoView.setOnErrorListener { mp, what, extra ->
+                            Log.d("video", "setOnErrorListener ")
 
-                        true
+                            true
+                        }
+                        delay(duration ?: 0)
+                        retriever.release();
+                        isVideoPlaying = false
                     }
-                    delay(duration ?: 0)
-                    retriever.release();
-                    isVideoPlaying = false
+
                 } else {
                     // transition.addTarget(bindingActivity.ImageView)
                     //TransitionManager.beginDelayedTransition(bindingActivity.root, transition)
                     videoView.isVisible = false
                     ImageView.isVisible = true
-                    ImageView.setImageURI(uri)
+                    if(uri.toFile().exists()) {
+                        ImageView.setImageURI(uri)
+                    }
                     delay(5000L)
                 }
             }
@@ -388,7 +396,6 @@ class MainActivity : AppCompatActivity() {
 
     @SuppressLint("HardwareIds")
     private fun setUpPlayer() {
-        cleanUpandReset()
         val android_id = Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID)
         Log.d("Android", "Android ID : " + android_id)
         val deviceId = Paper.book().read<String>(DeviceId)
@@ -397,21 +404,21 @@ class MainActivity : AppCompatActivity() {
                 .addValueEventListener(object : ValueEventListener {
                     @RequiresApi(Build.VERSION_CODES.O)
                     override fun onDataChange(snapshot: DataSnapshot) {
+                        println("Barcode Snapshot added")
                         showDefaultLocalImage()
                         cleanUpandReset()
-                        bindingActivity.progressCircular.isVisible = true
                         val dataClassList = mutableListOf<DataClass>()
                         snapshot.child("campaigns").children.forEach {
-                            val dataClass = it.getValue(DataClass::class.java)
-                            if (dataClass != null) {
-                                dataClassList.add(
-                                    dataClass
-                                )
+                            it?.let {
+                                it.getValue(DataClass::class.java)
+                                    ?.let { it1 -> dataClassList.add(it1) }
                             }
                         }
+                        println("Barcode Snapshot added " + dataClassList.size)
                         snapshot.child("list").children.forEach {
-                            val list = it.value as String
-                            defaultList.add(list)
+                            it?.let {
+                                it.getValue(String::class.java)?.let { it1 -> defaultList.add(it1) }
+                            }
                         }
                         println("Barcode" + Date().toInstant())
                         dataClassList.forEach { dataClass ->
@@ -438,28 +445,38 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showDefaultLocalImage() {
+        isDownloaded = false
         isLocalDefaultImageisShown = true
         bindingActivity.ImageView.isVisible = true
+        bindingActivity.videoView.stopPlayback()
         bindingActivity.videoView.isVisible = false
         bindingActivity.ImageView.setImageDrawable(resources.getDrawable(R.mipmap.ic_launcher))
+        bindingActivity.progressCircular.isVisible = true
     }
 
     private fun cleanUpandReset() {
         if (isVideoPlaying.not()) {
+            uriHashMap.values.forEach {
+                it.uriList?.forEach {  it ->
+                    it.toFile().delete()
+                }
+            }
+            defaultUriMapper.values.forEach {
+                it?.toFile()?.delete()
+            }
+
             uriHashMap.clear()
             defaultUriMapper.clear()
             timeSlotMap.clear()
             defaultList.clear()
             val downloadFolder =
                 Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-            if(downloadFolder.isDirectory){
+            if (downloadFolder.isDirectory) {
                 val list = downloadFolder.list()
-                for(file in list){
-                    File(downloadFolder,file).delete()
+                for (file in list) {
+                    File(downloadFolder, file).delete()
                 }
             }
-            uriHashMap.clear()
-            timeSlotMap.clear()
         }
     }
 
@@ -484,6 +501,7 @@ class MainActivity : AppCompatActivity() {
         dmr.setAllowedNetworkTypes(DownloadManager.Request.NETWORK_WIFI or DownloadManager.Request.NETWORK_MOBILE)
         val manager = getSystemService(DOWNLOAD_SERVICE) as DownloadManager
         val reference = manager.enqueue(dmr)
+        println("Barcode download called " + isDeafaultDownload)
         if (isDeafaultDownload.not()) {
             uriHashMap[reference] = UriMapper(
                 starTime = OffsetDateTime.parse(startTime).toInstant().toEpochMilli(),
