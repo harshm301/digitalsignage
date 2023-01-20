@@ -26,3 +26,14 @@ data class PlayMapper(
     val uriList: MutableList<Uri>? = null,
     var isSlotCompleted: Boolean = true
 )
+
+data class FooterInfo(
+    @SerializedName( "copyright")
+    val copyright:String = "",
+    @SerializedName("mail")
+    val mail:String = "",
+    @SerializedName("mobile")
+    val mobile:Long = 1,
+    @SerializedName("website")
+    val website:String = ""
+)

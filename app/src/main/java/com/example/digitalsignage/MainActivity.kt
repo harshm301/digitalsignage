@@ -12,31 +12,39 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
-import android.provider.ContactsContract
 import android.provider.Settings
 import android.text.Editable
 import android.util.Log
+import android.view.animation.Animation
+import android.view.animation.AnimationUtils
 import android.webkit.MimeTypeMap
 import android.webkit.URLUtil
 import android.widget.EditText
+import android.widget.NumberPicker.OnValueChangeListener
 import android.widget.Toast
+import androidx.activity.viewModels
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
-import androidx.core.net.toFile
 import androidx.core.view.isVisible
+import androidx.documentfile.provider.DocumentFile
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.lifecycleScope
 import com.example.digitalsignage.databinding.ActivityMainBinding
 import com.google.firebase.FirebaseApp
 import com.google.firebase.database.*
+import com.google.firebase.database.ktx.getValue
 import io.paperdb.Paper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
+import java.io.InputStream
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.util.*
+import java.util.concurrent.ConcurrentHashMap
+import kotlin.collections.HashMap
 import kotlin.collections.set
 
 
@@ -49,15 +57,17 @@ class MainActivity : AppCompatActivity() {
     private var ISFTU = "ISFTU"
     private var IS_DOWNLOAD_AGAIN = "IS_DOWNLOAD_AGAIN"
     private var DeviceId = "DeviceId"
-    var timeSlotMap: MutableMap<Long, PlayMapper> = mutableMapOf<Long, PlayMapper>().toSortedMap()
+    val timeSlotMap: MutableMap<Long, PlayMapper> = ConcurrentHashMap<Long, PlayMapper>()
     private lateinit var database: DatabaseReference
     private var defaultList = mutableListOf<String>()
-    private var defaultUriMapper: MutableMap<Long, Uri?> = mutableMapOf()
-    private var isDefaultBeingShown = false
+    private var defaultUriMapper: MutableMap<Long, Uri> = ConcurrentHashMap<Long,Uri>()
+    val viewModel: MainViewModel by viewModels()
+    private var isLoopStarted = false
     private var isDownloaded = false
     private var campaignRefreshed = false
     private var isVideoPlaying = false
     private var isLocalDefaultImageisShown = false
+    private var animBounce: Animation? = null
 
     @RequiresApi(Build.VERSION_CODES.O)
     private var currentTimeStamp = Instant.now().toEpochMilli()
@@ -134,36 +144,47 @@ class MainActivity : AppCompatActivity() {
                 DownloadManager.STATUS_RUNNING -> Toast.makeText(this, "RUNNING", Toast.LENGTH_LONG)
                     .show()
                 DownloadManager.STATUS_SUCCESSFUL -> {
-                    Log.d("Barcode", "Download Succesful")
                     val uri = downloadManager.getUriForDownloadedFile(id)
                     if (uri != null) {
                         if (uriHashMap.contains(id)) {
+                            Log.d("Barcode", "Download Succesful")
                             val uriMapper = uriHashMap[id]
-                            if (uriMapper?.uriList == null) {
-                                uriMapper?.copy(
-                                    uriList = mutableListOf(uri)
-                                )?.let { uriHashMap.put(id, it) }
-                            } else {
-                                val list = uriMapper.uriList
-                                list.add(uri)
-                                uriHashMap.put(
-                                    id, uriMapper.copy(
-                                        uriList = list
-                                    )
+                            val list = timeSlotMap[uriMapper?.starTime]?.uriList
+                            val playMapper = timeSlotMap[uriMapper?.starTime]
+                            if (list == null) {
+                                val mutableList = mutableListOf<Uri>(uri)
+                                mutableList.distinct()
+                                timeSlotMap[uriMapper!!.starTime] = playMapper!!.copy(
+                                    uriList = mutableList
                                 )
+                            } else {
+                                list.let { it1 ->
+                                    timeSlotMap[playMapper?.startTime]?.uriList?.add(
+                                        uri
+                                    )
+                                }
                             }
+                            Toast.makeText(
+                                this,
+                                "${totalItems - itemDownload} more item to download",
+                                Toast.LENGTH_SHORT
+                            ).show()
                         } else if (defaultUriMapper.contains(id)) {
-                            defaultUriMapper[id] = uri
+                            Log.d("Barcode", "Download Succesful")
+                            Log.d("Barcode", "defaultDownloader")
+                            defaultUriMapper.replace(id, uri)
+                            Toast.makeText(
+                                this,
+                                "${totalItems - itemDownload} more item to download",
+                                Toast.LENGTH_SHORT
+                            ).show()
                         }
                         itemDownload++
-                        Toast.makeText(
-                            this,
-                            "${totalItems - itemDownload} more item to download",
-                            Toast.LENGTH_SHORT
-                        ).show()
+                        bindingActivity.progressCircular.isVisible = false
+                        startPlaying()
                         if (itemDownload == totalItems) {
                             isDownloaded = true
-                            startPlaying()
+                            //startPlaying()
                         }
                     }
                 }
@@ -172,6 +193,7 @@ class MainActivity : AppCompatActivity() {
     }
 
 
+    @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         bindingActivity = ActivityMainBinding.inflate(layoutInflater)
@@ -181,13 +203,58 @@ class MainActivity : AppCompatActivity() {
             hasPermissions(context = this, PERMISSIONS)
             database = FirebaseDatabase.getInstance().reference
             Paper.book().write(IS_DOWNLOAD_AGAIN, false)
-            if (Paper.book().read(ISFTU, false) == false && Paper.book().contains(DeviceId).not()) {
+            animBounce = AnimationUtils.loadAnimation(this,R.anim.bounce)
+            if (Paper.book().read(ISFTU, false) == false && Paper.book().contains(DeviceId)
+                    .not()
+            ) {
                 setUpDeviceId()
             } else {
                 setUpPlayer()
             }
         } catch (e: Exception) {
             Toast.makeText(this, e.message, Toast.LENGTH_SHORT).show()
+        }
+        observer()
+    }
+
+    private fun observer() {
+        viewModel.playEvent.observe(this) {
+            bindingActivity.run {
+                when (it) {
+                    is PlayEvent.PlayImage -> {
+                        lifecycleScope.launch(Dispatchers.Main) {
+                            videoView.stopPlayback()
+                            videoView.isVisible = false
+                            ImageView.isVisible = true
+                            if(checkRight(this@MainActivity,it.uri)) {
+                                ImageView.startAnimation(animBounce)
+                              // ImageView.setImageURI(it.uri)
+                            }else{
+                                showDefaultLocalImage()
+                            }
+                        }
+                    }
+                    is PlayEvent.PlayVideo -> {
+                        lifecycleScope.launch(Dispatchers.Main) {
+                            if (checkRight(this@MainActivity,it.uri)) {
+                                ImageView.isVisible = false
+                                videoView.isVisible = true
+                                videoView.setVideoURI(it.uri)
+                                isVideoPlaying = true
+                                videoView.start()
+                                videoView.setZOrderOnTop(true)
+                            }else{
+                                showDefaultLocalImage()
+                            }
+                        }
+                    }
+                    PlayEvent.RestartCampaign -> {
+                        lifecycleScope.launch(Dispatchers.IO) {
+                            startPlayingIdex()
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -256,140 +323,61 @@ class MainActivity : AppCompatActivity() {
 
     @RequiresApi(Build.VERSION_CODES.O)
     private fun startPlaying() {
-        lifecycleScope.launch(Dispatchers.Main) {
-            uriHashMap.forEach {
-                val list: MutableList<Uri>? = timeSlotMap[it.value.starTime]?.uriList
-                if (list == null) {
-                    val mutableList = mutableListOf<Uri>()
-                    it.value.uriList?.let { it1 -> mutableList.addAll(it1) }
-                    timeSlotMap.put(
-                        it.value.starTime,
-                        PlayMapper(
-                            startTime = it.value.starTime,
-                            endTime = it.value.endTime,
-                            uriList = it.value.uriList
-                        )
-                    )
-                } else {
-                    it.value.uriList?.let { it1 ->
-                        timeSlotMap.get(it.value.starTime)?.uriList?.addAll(
-                            it1
-                        )
-                    }
-                }
-            }
-
-            bindingActivity.progressCircular.isVisible = false
-            campaignRefreshed = true
-            val listFiles = timeSlotMap.values.toList().sortedBy {
-                it.startTime
-            }.filterNot {
-                it.endTime <= currentTimeStamp && it.startTime <= currentTimeStamp
-            }.toMutableList()
-            Log.d("Barcode", "Calls Function one time only ${listFiles.size}")
-            isLocalDefaultImageisShown = false
-            if(isDownloaded) {
-                startPlayingIdex(listFiles)
-            }
+        campaignRefreshed = true
+        if (isLoopStarted.not()) {
+            isLoopStarted = true
+            startPlayingIdex()
         }
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
-    private suspend fun startPlayingIdex(listFiles: MutableList<PlayMapper>) {
+    private fun startPlayingIdex() {
+        if(viewModel.isCurrentingPlaying){
+            return
+        }
+        Log.d("Barcdoe","startPlayIndex")
         if (isLocalDefaultImageisShown.not()) {
             currentTimeStamp = Instant.now().toEpochMilli()
-            for (playMapper in listFiles) {
-                if (currentTimeStamp >= playMapper.startTime && playMapper.endTime >= currentTimeStamp) {
+            val currentSlot = timeSlotMap.filter {
+                currentTimeStamp >= it.value.startTime && it.value.endTime >= currentTimeStamp
+            }
+            for (keys in currentSlot.keys) {
+                val playMapper = currentSlot[keys]
+                if (currentTimeStamp >= playMapper!!.startTime && playMapper.endTime >= currentTimeStamp) {
                     playMapper.uriList?.let {
                         showCampaigs(it)
                     }
                     currentTimeStamp = Instant.now().toEpochMilli()
                     if (currentTimeStamp >= playMapper.endTime) {
-                        listFiles.remove(playMapper)
+                        timeSlotMap.remove(keys)
                     }
                     break
                 } else {
                     showDefault()
                 }
             }
-            if (listFiles.isEmpty()){
+
+            if (currentSlot.isEmpty()) {
                 showDefault()
-            }else {
-                startPlayingIdex(listFiles)
             }
         }
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
-    private suspend fun showDefault() {
-        if (defaultUriMapper.values.isEmpty()) {
-            return
-        }
-        val list = defaultUriMapper.values.toList()
-        list.forEach {
-            currentTimeStamp = if (it != null) {
-                playImageorVideo(it)
-                Log.d("Barcode", "When start from  default block : ${Date(currentTimeStamp)}")
-                Instant.now().toEpochMilli()
-            } else {
-                bindingActivity.ImageView.setImageDrawable(resources.getDrawable(R.mipmap.ic_launcher))
-                Instant.now().toEpochMilli()
-            }
+    private fun showDefault() {
+        if (viewModel.isCurrentingPlaying.not()) {
+            val list = defaultUriMapper.values.toList()
+            viewModel.playImageAndVideo(this, list)
+            Log.d("Barcode", "When start from  default block : ${Date(currentTimeStamp)}")
+            Log.d("Barcode", list.toString())
+            currentTimeStamp = Instant.now().toEpochMilli()
         }
     }
 
-    private suspend fun showCampaigs(listFiles: MutableList<Uri>) {
+    private fun showCampaigs(listFiles: MutableList<Uri>) {
         Log.d("Barcode", "sampaigs, ${listFiles}")
-        listFiles.forEach {
-            playImageorVideo(it)
-        }
-    }
-
-    private suspend fun playImageorVideo(uri: Uri) {
-        //val transition: Transition = CircularRevealTransition()
-        try {
-            val fileExt = MimeTypeMap.getSingleton()
-                .getExtensionFromMimeType(contentResolver.getType(uri))
-            bindingActivity.run {
-                if (fileExt == "mp4") {
-                    // val File = File()
-                    //transition.addTarget(bindingActivity.videoView)
-                    //  TransitionManager.beginDelayedTransition(bindingActivity.root, transition)
-                    if (uri.toFile().exists()) {
-                        ImageView.isVisible = false
-                        videoView.isVisible = true
-                        videoView.setVideoURI(uri)
-                        isVideoPlaying = true
-                        videoView.start()
-                        videoView.setZOrderOnTop(true)
-                        val retriever = MediaMetadataRetriever();
-                        retriever.setDataSource(this@MainActivity, uri);
-                        val duration =
-                            retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
-                                ?.toLong()
-                        videoView.setOnErrorListener { mp, what, extra ->
-                            Log.d("video", "setOnErrorListener ")
-
-                            true
-                        }
-                        delay(duration ?: 0)
-                        retriever.release();
-                        isVideoPlaying = false
-                    }
-
-                } else {
-                    // transition.addTarget(bindingActivity.ImageView)
-                    //TransitionManager.beginDelayedTransition(bindingActivity.root, transition)
-                    videoView.isVisible = false
-                    ImageView.isVisible = true
-                    if(uri.toFile().exists()) {
-                        ImageView.setImageURI(uri)
-                    }
-                    delay(5000L)
-                }
-            }
-        } catch (e: Exception) {
-            Log.d("Barcode", e.toString())
+        if (viewModel.isCurrentingPlaying.not()) {
+            viewModel.playImageAndVideo(this, listFiles)
         }
     }
 
@@ -405,35 +393,26 @@ class MainActivity : AppCompatActivity() {
                     @RequiresApi(Build.VERSION_CODES.O)
                     override fun onDataChange(snapshot: DataSnapshot) {
                         println("Barcode Snapshot added")
+                        bindingActivity.progressCircular.isVisible = true
                         showDefaultLocalImage()
-                        cleanUpandReset()
-                        val dataClassList = mutableListOf<DataClass>()
-                        snapshot.child("campaigns").children.forEach {
-                            it?.let {
-                                it.getValue(DataClass::class.java)
-                                    ?.let { it1 -> dataClassList.add(it1) }
+                        lifecycleScope.launch(Dispatchers.IO) {
+                            cleanUpandReset()
+                            val dataClassList = mutableListOf<DataClass>()
+                            snapshot.child("campaigns").children.forEach {
+                                it?.let {
+                                    it.getValue(DataClass::class.java)
+                                        ?.let { it1 -> dataClassList.add(it1) }
+                                }
                             }
-                        }
-                        println("Barcode Snapshot added " + dataClassList.size)
-                        snapshot.child("list").children.forEach {
-                            it?.let {
-                                it.getValue(String::class.java)?.let { it1 -> defaultList.add(it1) }
+                            println("Barcode Snapshot added " + dataClassList.size)
+                            snapshot.child("list").children.forEach {
+                                it?.let {
+                                    it.getValue(String::class.java)
+                                        ?.let { it1 -> defaultList.add(it1) }
+                                }
                             }
-                        }
-                        println("Barcode" + Date().toInstant())
-                        dataClassList.forEach { dataClass ->
-                            totalItems += dataClass.urls!!.size
-                            dataClass.urls.forEach {
-                                onDownload(
-                                    it.trim(),
-                                    startTime = dataClass.startTime,
-                                    endTime = dataClass.endTime,
-                                )
-                            }
-                        }
-                        totalItems += defaultList.size
-                        defaultList.forEach {
-                            onDownload(it, isDeafaultDownload = true)
+                            println("Barcode" + Date().toInstant())
+                            onDownload(dataClass = dataClassList, defaultUrl = defaultList)
                         }
                     }
 
@@ -442,29 +421,46 @@ class MainActivity : AppCompatActivity() {
                     }
                 })
         }
+
+        database.child("footerInfo").addValueEventListener(object :ValueEventListener{
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val footerInfo = snapshot.getValue(FooterInfo::class.java)
+                displayFooterInfo(footerInfo)
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                TODO("Not yet implemented")
+            }
+        })
+    }
+
+    private fun displayFooterInfo(footerInfo: FooterInfo?) {
+        lifecycleScope.launch(Dispatchers.Main){
+            bindingActivity.run {
+                footerInfo?.let {
+                    copyright.text = it.copyright
+                    mobilenumber.text = "mobile : ${it.mobile}"
+                    mailId.text = "mail : ${it.mail}"
+                    website.text = "website : ${it.website}"
+                }
+            }
+        }
+
     }
 
     private fun showDefaultLocalImage() {
-        isDownloaded = false
-        isLocalDefaultImageisShown = true
-        bindingActivity.ImageView.isVisible = true
-        bindingActivity.videoView.stopPlayback()
-        bindingActivity.videoView.isVisible = false
-        bindingActivity.ImageView.setImageDrawable(resources.getDrawable(R.mipmap.ic_launcher))
-        bindingActivity.progressCircular.isVisible = true
+        lifecycleScope.launch(Dispatchers.Main) {
+            isDownloaded = false
+            //isLocalDefaultImageisShown = true
+            bindingActivity.ImageView.isVisible = true
+            bindingActivity.videoView.stopPlayback()
+            bindingActivity.videoView.isVisible = false
+            bindingActivity.ImageView.setImageDrawable(resources.getDrawable(R.mipmap.ic_launcher))
+        }
     }
 
     private fun cleanUpandReset() {
-        if (isVideoPlaying.not()) {
-            uriHashMap.values.forEach {
-                it.uriList?.forEach {  it ->
-                    it.toFile().delete()
-                }
-            }
-            defaultUriMapper.values.forEach {
-                it?.toFile()?.delete()
-            }
-
+        //if (isVideoPlaying.not()) {
             uriHashMap.clear()
             defaultUriMapper.clear()
             timeSlotMap.clear()
@@ -477,18 +473,41 @@ class MainActivity : AppCompatActivity() {
                     File(downloadFolder, file).delete()
                 }
             }
-        }
+       //    }
     }
 
 
     @RequiresApi(Build.VERSION_CODES.O)
     private fun onDownload(
-        s: String,
-        startTime: String? = null,
-        endTime: String? = null,
-        isDeafaultDownload: Boolean = false
+        dataClass: MutableList<DataClass>? = null,
+        defaultUrl: List<String>? = null
     ) {
-        // Picasso.with(this).load(s).into(picassoImageTarget(context = this, pathImage, "${imageName}.jpeg"));
+        lifecycleScope.launch(Dispatchers.IO) {
+            // Picasso.with(this).load(s).into(picassoImageTarget(context = this, pathImage, "${imageName}.jpeg"));
+            defaultUrl?.forEach {
+                defaultUriMapper[download(it)] = Uri.EMPTY
+            }
+            dataClass?.forEach { dataClass ->
+                totalItems += dataClass.urls?.size ?: 0
+                dataClass.urls?.forEach {
+                    val start = OffsetDateTime.parse(dataClass.startTime).toInstant().toEpochMilli()
+                    val end = OffsetDateTime.parse(dataClass.endTime).toInstant().toEpochMilli()
+                    uriHashMap[download(it)] = UriMapper(
+                        starTime = start,
+                        endTime = end
+                    )
+                    timeSlotMap[start] = PlayMapper(
+                        startTime = start,
+                        endTime = end,
+                        uriList = null
+                    )
+                }
+            }
+            totalItems += defaultList.size
+        }
+    }
+
+    private fun download(s: String): Long {
         val dmr = DownloadManager.Request(Uri.parse(s))
         //Alternative if you don't know filename
         //Alternative if you don't know filename
@@ -500,16 +519,7 @@ class MainActivity : AppCompatActivity() {
         dmr.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
         dmr.setAllowedNetworkTypes(DownloadManager.Request.NETWORK_WIFI or DownloadManager.Request.NETWORK_MOBILE)
         val manager = getSystemService(DOWNLOAD_SERVICE) as DownloadManager
-        val reference = manager.enqueue(dmr)
-        println("Barcode download called " + isDeafaultDownload)
-        if (isDeafaultDownload.not()) {
-            uriHashMap[reference] = UriMapper(
-                starTime = OffsetDateTime.parse(startTime).toInstant().toEpochMilli(),
-                endTime = OffsetDateTime.parse(endTime).toInstant().toEpochMilli()
-            )
-        } else {
-            defaultUriMapper[reference] = null
-        }
+        return manager.enqueue(dmr)
     }
 
     override fun onResume() {
@@ -519,5 +529,6 @@ class MainActivity : AppCompatActivity() {
             IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
         )
     }
+
 
 }

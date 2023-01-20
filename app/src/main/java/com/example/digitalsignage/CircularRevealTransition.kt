@@ -28,7 +28,7 @@ class CircularRevealTransition : Visibility() {
         //make view invisible until animation actually starts
         view.setAlpha(0F)
         reveal.addListener(object : AnimatorListenerAdapter() {
-            override fun onAnimationStart(animation: Animator?) {
+            override fun onAnimationStart(animation: Animator) {
                 view.setAlpha(1F)
             }
         })
