@@ -1,11 +1,30 @@
 package com.example.digitalsignage
 
+import android.Manifest
+import android.app.Activity
+import android.app.AlertDialog
+import android.app.DownloadManager
 import android.content.Context
+import android.content.DialogInterface
+import android.content.pm.PackageManager
 import android.database.Cursor
 import android.net.Uri
+import android.os.Environment
+import android.text.Editable
 import android.util.Log
+import android.webkit.MimeTypeMap
+import android.webkit.URLUtil
+import android.widget.EditText
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
 import java.io.InputStream
 
+
+var PERMISSION_ALL = 101
+var PERMISSIONS = arrayOf(
+    Manifest.permission.READ_EXTERNAL_STORAGE,
+    Manifest.permission.WRITE_EXTERNAL_STORAGE
+)
 fun checkRight(context: Context, uri: Uri?): Boolean {
     if (uri == null) return false
     val resolver = context.contentResolver
@@ -43,4 +62,55 @@ fun checkRight(context: Context, uri: Uri?): Boolean {
         }
     }
     return isUriExist && isFileExist
+}
+
+fun hasPermissions(activity: Activity, permissions: Array<String>,permission_code:Int) {
+    if (ActivityCompat.checkSelfPermission(
+            activity,
+            Manifest.permission.READ_EXTERNAL_STORAGE
+        ) != PackageManager.PERMISSION_GRANTED
+    ) {
+        ActivityCompat.requestPermissions(activity, permissions, permission_code)
+    }
+}
+
+
+fun showAlertBox(context: Activity, function: (string:String) -> Unit){
+    val alert: AlertDialog.Builder = AlertDialog.Builder(context)
+    alert.setTitle("Enter device id")
+    alert.setMessage("you can only set device id once")
+    alert.setCancelable(false)
+
+// Set an EditText view to get user input
+
+// Set an EditText view to get user input
+    val input = EditText(context)
+    alert.setView(input)
+
+    alert.setPositiveButton("Ok", DialogInterface.OnClickListener { dialog, whichButton ->
+        val value: Editable? = input.text
+        function(value.toString())
+        // Do something with value!
+    })
+
+    alert.setNegativeButton("Cancel",
+        DialogInterface.OnClickListener { dialog, whichButton ->
+            // Canceled.
+            context.finish()
+        })
+    alert.show()
+}
+
+fun download(context: Context,s: String): Long {
+    val dmr = DownloadManager.Request(Uri.parse(s))
+    //Alternative if you don't know filename
+    val fileName: String =
+        URLUtil.guessFileName(s, null, MimeTypeMap.getFileExtensionFromUrl(s))
+    dmr.setTitle(fileName)
+    dmr.setDescription("Some descrition about file") //optional
+    dmr.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
+    dmr.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+    dmr.setAllowedNetworkTypes(DownloadManager.Request.NETWORK_WIFI or DownloadManager.Request.NETWORK_MOBILE)
+    val manager = context.getSystemService(AppCompatActivity.DOWNLOAD_SERVICE) as DownloadManager
+    return manager.enqueue(dmr)
 }

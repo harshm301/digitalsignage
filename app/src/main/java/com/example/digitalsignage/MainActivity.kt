@@ -1,13 +1,14 @@
+/*
 package com.example.digitalsignage
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.app.AlarmManager
 import android.app.AlertDialog
 import android.app.DownloadManager
+import android.app.PendingIntent
 import android.content.*
 import android.content.pm.PackageManager
-import android.database.Cursor
-import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -20,31 +21,24 @@ import android.view.animation.AnimationUtils
 import android.webkit.MimeTypeMap
 import android.webkit.URLUtil
 import android.widget.EditText
-import android.widget.NumberPicker.OnValueChangeListener
 import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.view.isVisible
-import androidx.documentfile.provider.DocumentFile
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.lifecycleScope
 import com.example.digitalsignage.databinding.ActivityMainBinding
 import com.google.firebase.FirebaseApp
 import com.google.firebase.database.*
-import com.google.firebase.database.ktx.getValue
 import io.paperdb.Paper
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
-import java.io.InputStream
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.collections.HashMap
 import kotlin.collections.set
 
 
@@ -85,112 +79,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
-    private fun CheckDwnloadStatus(id: Long) {
-        // TODO Auto-generated method stub
-        val downloadManager = getSystemService(DOWNLOAD_SERVICE) as DownloadManager
-        val query = DownloadManager.Query()
-        query.setFilterById(id)
-        val cursor: Cursor = downloadManager.query(query)
-        if (cursor.moveToFirst()) {
-            val columnIndex: Int = cursor
-                .getColumnIndex(DownloadManager.COLUMN_STATUS)
-            val status: Int = cursor.getInt(columnIndex)
-            val columnReason: Int = cursor
-                .getColumnIndex(DownloadManager.COLUMN_REASON)
-            val reason: Int = cursor.getInt(columnReason)
-            when (status) {
-                DownloadManager.STATUS_FAILED -> {
-                    var failedReason = ""
-                    when (reason) {
-                        DownloadManager.ERROR_CANNOT_RESUME -> failedReason = "ERROR_CANNOT_RESUME"
-                        DownloadManager.ERROR_DEVICE_NOT_FOUND -> failedReason =
-                            "ERROR_DEVICE_NOT_FOUND"
-                        DownloadManager.ERROR_FILE_ALREADY_EXISTS -> failedReason =
-                            "ERROR_FILE_ALREADY_EXISTS"
-                        DownloadManager.ERROR_FILE_ERROR -> failedReason = "ERROR_FILE_ERROR"
-                        DownloadManager.ERROR_HTTP_DATA_ERROR -> failedReason =
-                            "ERROR_HTTP_DATA_ERROR"
-                        DownloadManager.ERROR_INSUFFICIENT_SPACE -> failedReason =
-                            "ERROR_INSUFFICIENT_SPACE"
-                        DownloadManager.ERROR_TOO_MANY_REDIRECTS -> failedReason =
-                            "ERROR_TOO_MANY_REDIRECTS"
-                        DownloadManager.ERROR_UNHANDLED_HTTP_CODE -> failedReason =
-                            "ERROR_UNHANDLED_HTTP_CODE"
-                        DownloadManager.ERROR_UNKNOWN -> failedReason = "ERROR_UNKNOWN"
-                    }
-                    Toast.makeText(
-                        this, "FAILED: $failedReason",
-                        Toast.LENGTH_LONG
-                    ).show()
-                }
-                DownloadManager.STATUS_PAUSED -> {
-                    var pausedReason = ""
-                    when (reason) {
-                        DownloadManager.PAUSED_QUEUED_FOR_WIFI -> pausedReason =
-                            "PAUSED_QUEUED_FOR_WIFI"
-                        DownloadManager.PAUSED_UNKNOWN -> pausedReason = "PAUSED_UNKNOWN"
-                        DownloadManager.PAUSED_WAITING_FOR_NETWORK -> pausedReason =
-                            "PAUSED_WAITING_FOR_NETWORK"
-                        DownloadManager.PAUSED_WAITING_TO_RETRY -> pausedReason =
-                            "PAUSED_WAITING_TO_RETRY"
-                    }
-                    Toast.makeText(
-                        this, "PAUSED: $pausedReason",
-                        Toast.LENGTH_LONG
-                    ).show()
-                }
-                DownloadManager.STATUS_PENDING -> Toast.makeText(this, "PENDING", Toast.LENGTH_LONG)
-                    .show()
-                DownloadManager.STATUS_RUNNING -> Toast.makeText(this, "RUNNING", Toast.LENGTH_LONG)
-                    .show()
-                DownloadManager.STATUS_SUCCESSFUL -> {
-                    val uri = downloadManager.getUriForDownloadedFile(id)
-                    if (uri != null) {
-                        if (uriHashMap.contains(id)) {
-                            Log.d("Barcode", "Download Succesful")
-                            val uriMapper = uriHashMap[id]
-                            val list = timeSlotMap[uriMapper?.starTime]?.uriList
-                            val playMapper = timeSlotMap[uriMapper?.starTime]
-                            if (list == null) {
-                                val mutableList = mutableListOf<Uri>(uri)
-                                mutableList.distinct()
-                                timeSlotMap[uriMapper!!.starTime] = playMapper!!.copy(
-                                    uriList = mutableList
-                                )
-                            } else {
-                                list.let { it1 ->
-                                    timeSlotMap[playMapper?.startTime]?.uriList?.add(
-                                        uri
-                                    )
-                                }
-                            }
-                            Toast.makeText(
-                                this,
-                                "${totalItems - itemDownload} more item to download",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        } else if (defaultUriMapper.contains(id)) {
-                            Log.d("Barcode", "Download Succesful")
-                            Log.d("Barcode", "defaultDownloader")
-                            defaultUriMapper.replace(id, uri)
-                            Toast.makeText(
-                                this,
-                                "${totalItems - itemDownload} more item to download",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        }
-                        itemDownload++
-                        bindingActivity.progressCircular.isVisible = false
-                        startPlaying()
-                        if (itemDownload == totalItems) {
-                            isDownloaded = true
-                            //startPlaying()
-                        }
-                    }
-                }
-            }
-        }
-    }
+
 
 
     @RequiresApi(Build.VERSION_CODES.O)
@@ -227,8 +116,8 @@ class MainActivity : AppCompatActivity() {
                             videoView.isVisible = false
                             ImageView.isVisible = true
                             if(checkRight(this@MainActivity,it.uri)) {
-                                ImageView.startAnimation(animBounce)
-                              // ImageView.setImageURI(it.uri)
+                                //ImageView.startAnimation(animBounce)
+                               ImageView.setImageURI(it.uri)
                             }else{
                                 showDefaultLocalImage()
                             }
@@ -237,6 +126,7 @@ class MainActivity : AppCompatActivity() {
                     is PlayEvent.PlayVideo -> {
                         lifecycleScope.launch(Dispatchers.Main) {
                             if (checkRight(this@MainActivity,it.uri)) {
+                                videoView.stopPlayback()
                                 ImageView.isVisible = false
                                 videoView.isVisible = true
                                 videoView.setVideoURI(it.uri)
@@ -246,6 +136,8 @@ class MainActivity : AppCompatActivity() {
                             }else{
                                 showDefaultLocalImage()
                             }
+
+                          //  videoView.setOnErrorListener(MediaPlayer.OnErrorListener { p0, p1, p2 -> })
                         }
                     }
                     PlayEvent.RestartCampaign -> {
@@ -326,7 +218,26 @@ class MainActivity : AppCompatActivity() {
         campaignRefreshed = true
         if (isLoopStarted.not()) {
             isLoopStarted = true
-            startPlayingIdex()
+            //startPlayingIdex()
+            //setAlarm(timeInMillis = timeSlotMap.keys)
+        }
+    }
+
+    private fun setAlarm(timeInMillis: MutableList<DataClass>) {
+        val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        alarmManager.cancel()
+        for(time in timeInMillis) {
+            val intent = Intent(this, MyAlarm::class.java)
+            val pendingIntent = PendingIntent.getBroadcast(this, 0, intent, PendingIntent.FLAG_IMMUTABLE)
+            //pendingIntent
+            alarmManager.setAndAllowWhileIdle(
+                AlarmManager.RTC,
+                OffsetDateTime.parse(time.startTime).toInstant().toEpochMilli(),
+                pendingIntent
+            )
+            lifecycleScope.launch(Dispatchers.Main) {
+                Toast.makeText(this@MainActivity, "Alarm is set", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
@@ -344,14 +255,20 @@ class MainActivity : AppCompatActivity() {
             for (keys in currentSlot.keys) {
                 val playMapper = currentSlot[keys]
                 if (currentTimeStamp >= playMapper!!.startTime && playMapper.endTime >= currentTimeStamp) {
-                    playMapper.uriList?.let {
-                        showCampaigs(it)
+
+                    if(playMapper.uriList==null){
+                        viewModel.restartCampaign()
+                        break
+                    }else {
+                        playMapper.uriList.let {
+                            showCampaigs(it)
+                        }
+                        currentTimeStamp = Instant.now().toEpochMilli()
+                        if (currentTimeStamp >= playMapper.endTime) {
+                            timeSlotMap.remove(keys)
+                        }
+                        break
                     }
-                    currentTimeStamp = Instant.now().toEpochMilli()
-                    if (currentTimeStamp >= playMapper.endTime) {
-                        timeSlotMap.remove(keys)
-                    }
-                    break
                 } else {
                     showDefault()
                 }
@@ -366,7 +283,7 @@ class MainActivity : AppCompatActivity() {
     @RequiresApi(Build.VERSION_CODES.O)
     private fun showDefault() {
         if (viewModel.isCurrentingPlaying.not()) {
-            val list = defaultUriMapper.values.toList()
+            val list = defaultUriMapper.values.toMutableList()
             viewModel.playImageAndVideo(this, list)
             Log.d("Barcode", "When start from  default block : ${Date(currentTimeStamp)}")
             Log.d("Barcode", list.toString())
@@ -412,6 +329,7 @@ class MainActivity : AppCompatActivity() {
                                 }
                             }
                             println("Barcode" + Date().toInstant())
+                            setAlarm(dataClassList)
                             onDownload(dataClass = dataClassList, defaultUrl = defaultList)
                         }
                     }
@@ -530,5 +448,11 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
+    private class MyAlarm : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            Log.d("Alarm Bell", "Alarm just fired")
+        }
+    }
 
 }
+*/
