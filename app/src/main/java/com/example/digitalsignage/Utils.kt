@@ -10,6 +10,7 @@ import android.content.pm.PackageManager
 import android.database.Cursor
 import android.net.Uri
 import android.os.Environment
+import android.provider.MediaStore
 import android.text.Editable
 import android.util.Log
 import android.webkit.MimeTypeMap
@@ -17,6 +18,7 @@ import android.webkit.URLUtil
 import android.widget.EditText
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import java.io.File
 import java.io.InputStream
 
 
@@ -113,4 +115,28 @@ fun download(context: Context,s: String): Long {
     dmr.setAllowedNetworkTypes(DownloadManager.Request.NETWORK_WIFI or DownloadManager.Request.NETWORK_MOBILE)
     val manager = context.getSystemService(AppCompatActivity.DOWNLOAD_SERVICE) as DownloadManager
     return manager.enqueue(dmr)
+}
+
+fun deleteFile(context: Context,file: File): Boolean {
+    var deleted: Boolean
+    //Delete from Android Medialib, for consistency with device MTP storing and other apps listing content:// media
+    if (file.isDirectory) {
+        deleted = true
+        for (child in file.listFiles()) deleted = deleted and deleteFile(context, child)
+        if (deleted) deleted = deleted and file.delete()
+    } else {
+        val cr = context.contentResolver
+        deleted = try {
+            cr.delete(
+                MediaStore.Files.getContentUri("external"),
+                MediaStore.Files.FileColumns.DATA + "=?", arrayOf(file.path)) > 0
+        } catch (ignored: IllegalArgumentException) {
+            false
+        } catch (ignored: SecurityException) {
+            false
+        }
+        // Can happen on some devices...
+        if (file.exists()) deleted = deleted or file.delete()
+    }
+    return deleted
 }

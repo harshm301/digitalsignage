@@ -6,11 +6,13 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.net.Uri
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.webkit.URLUtil
 import android.widget.Toast
 import androidx.activity.viewModels
+import androidx.core.net.toFile
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import com.example.digitalsignage.databinding.ActivityMain2Binding
@@ -21,6 +23,7 @@ import io.paperdb.Paper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import java.io.File
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.util.*
@@ -105,9 +108,12 @@ class MainActivity2 : AppCompatActivity() {
                         val list = viewModel.fetchDownloadedDefaultImages()
                         showDefaultImages(list)
                     }
-
                 }
             } catch (e: Exception) {
+                lifecycleScope.launch(Dispatchers.Main) {
+                    Toast.makeText(this@MainActivity2, e.message, Toast.LENGTH_SHORT).show()
+                }
+                //showDefaultImages()
                 // Toast.makeText(this, "Something went wrong", Toast.LENGTH_SHORT).show()
             }
         }
@@ -133,6 +139,8 @@ class MainActivity2 : AppCompatActivity() {
                 showAlertBox(this) {
                     pushDeviceIdToFirebase(it)
                 }
+            } else {
+
             }
         } catch (e: Exception) {
             Toast.makeText(this, e.message, Toast.LENGTH_SHORT).show()
@@ -172,7 +180,6 @@ class MainActivity2 : AppCompatActivity() {
                                 videoView.setZOrderOnTop(true)
                             }
 
-                            //  videoView.setOnErrorListener(MediaPlayer.OnErrorListener { p0, p1, p2 -> })
                         }
                     }
                     PlayEvent.RestartCampaign -> {
@@ -186,10 +193,12 @@ class MainActivity2 : AppCompatActivity() {
         }
     }
 
-    private fun showLocalImages() {
-        binding.ImageView.isVisible = true
-        binding.ImageView.setImageDrawable(resources.getDrawable(R.drawable.ic_launcher_background))
-        viewModel.restartCampaign()
+    private fun showLocalImages(isFromClear: Boolean = false) {
+        lifecycleScope.launch(Dispatchers.Main) {
+            binding.ImageView.isVisible = true
+            binding.ImageView.setImageDrawable(resources.getDrawable(R.mipmap.ic_launcher))
+        }
+        if (isFromClear.not()) viewModel.restartCampaign()
     }
 
     private fun pushDeviceIdToFirebase(toString: String) {
@@ -252,12 +261,29 @@ class MainActivity2 : AppCompatActivity() {
                     }
                 })
 
+            database.child("user").child(deviceId!!).child("clearCache")
+                .addValueEventListener(object : ValueEventListener {
+                    override fun onDataChange(snapshot: DataSnapshot) {
+                        lifecycleScope.launch(Dispatchers.IO) {
+                            val clear = snapshot.getValue(Boolean::class.java)
+                            if (clear == true) {
+                                clearEverything()
+                            }
+                        }
+                    }
+
+                    override fun onCancelled(error: DatabaseError) {
+
+                    }
+
+                })
+
         }
 
         database.child("footerInfo").addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val footerInfo = snapshot.getValue(FooterInfo::class.java)
-                // displayFooterInfo(footerInfo)
+                displayFooterInfo(footerInfo)
             }
 
             override fun onCancelled(error: DatabaseError) {
@@ -266,8 +292,42 @@ class MainActivity2 : AppCompatActivity() {
         })
     }
 
+    private suspend fun clearEverything() {
+        job?.cancel()
+        val list = viewModel.getAllCampaign()
+        val downloadedFiles = viewModel.getAllDownloadedFiles()
+        list.forEach {
+            it.fileUri?.let { string ->
+                deleteFile(this, File(Uri.parse(string).path))
+            }
+        }
+        downloadedFiles.forEach {
+            it.fileUri?.let { string ->
+                deleteFile(this, File(Uri.parse(string).path))
+            }
+        }
+        viewModel.deleteAllCampaign()
+        viewModel.deleteAllDownloadedFiles()
+        showLocalImages(isFromClear = true)
+    }
+
+    private fun displayFooterInfo(footerInfo: FooterInfo?) {
+        lifecycleScope.launch(Dispatchers.Main) {
+            binding.run {
+                footerInfo?.let {
+                    copyright.text = it.copyright
+                    mobilenumber.text = "mobile : ${it.mobile}"
+                    mailId.text = "mail : ${it.mail}"
+                    website.text = "website : ${it.website}"
+                }
+            }
+        }
+
+    }
+
+
     private suspend fun filterOutDefaultList(dataClassList: MutableList<String>) {
-        val localList = viewModel.getAllDownloadedFiles()
+        val localList = viewModel.getAllDownloadedFiles().distinctBy { it.fileUrl }
         viewModel.deleteAllDownloadedFiles()
         val common = mutableListOf<DefaultList>()
         localList.forEach { default ->

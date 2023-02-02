@@ -36,7 +36,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         fetchCampaignFiles()
     }
 
-    fun fetchCampaignFiles() {
+    private fun fetchCampaignFiles() {
         viewModelScope.launch {
             _campaignFiles.postValue(
                 signageRepository.getAllCampaign()
