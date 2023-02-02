@@ -18,12 +18,13 @@ interface SignageDoa {
     @Query("DELETE FROM defaultList")
     suspend fun deleteDefaults()
 
-    @Query("Select * from campaigns where start_time=:startTime and end_time=:endTime and campaign_id=:campaignId and is_downloaded=:isDownloaded")
+    @Query("Select * from campaigns where start_time=:startTime and end_time=:endTime and campaign_id=:campaignId and is_downloaded=:isDownloaded ORDER BY :order ASC")
     suspend fun getCurrentCampaign(
         startTime: String,
         endTime: String,
         campaignId: String,
-        isDownloaded: Boolean = true
+        isDownloaded: Boolean = true,
+        order:String = "order"
     ): List<CampaignFile>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)

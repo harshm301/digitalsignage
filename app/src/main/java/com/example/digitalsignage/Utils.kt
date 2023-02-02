@@ -4,11 +4,13 @@ import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
 import android.app.DownloadManager
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.DialogInterface
 import android.content.pm.PackageManager
 import android.database.Cursor
 import android.net.Uri
+import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import android.text.Editable
@@ -16,17 +18,27 @@ import android.util.Log
 import android.webkit.MimeTypeMap
 import android.webkit.URLUtil
 import android.widget.EditText
+import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import java.io.File
 import java.io.InputStream
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
 
 
 var PERMISSION_ALL = 101
+
+@RequiresApi(Build.VERSION_CODES.R)
 var PERMISSIONS = arrayOf(
     Manifest.permission.READ_EXTERNAL_STORAGE,
-    Manifest.permission.WRITE_EXTERNAL_STORAGE
+    Manifest.permission.WRITE_EXTERNAL_STORAGE,
+    Manifest.permission.MANAGE_EXTERNAL_STORAGE
 )
+
 fun checkRight(context: Context, uri: Uri?): Boolean {
     if (uri == null) return false
     val resolver = context.contentResolver
@@ -55,7 +67,7 @@ fun checkRight(context: Context, uri: Uri?): Boolean {
         true
     } catch (t: Throwable) {
         // File was not found eg: open failed: ENOENT (No such file or directory)
-        Log.d("Barcode","2. Check File Exist Error: ${t.message}")
+        Log.d("Barcode", "2. Check File Exist Error: ${t.message}")
         false
     } finally {
         try {
@@ -66,18 +78,21 @@ fun checkRight(context: Context, uri: Uri?): Boolean {
     return isUriExist && isFileExist
 }
 
-fun hasPermissions(activity: Activity, permissions: Array<String>,permission_code:Int) {
-    if (ActivityCompat.checkSelfPermission(
-            activity,
-            Manifest.permission.READ_EXTERNAL_STORAGE
-        ) != PackageManager.PERMISSION_GRANTED
-    ) {
-        ActivityCompat.requestPermissions(activity, permissions, permission_code)
+fun hasPermissions(activity: Activity, permissions: Array<String>, permission_code: Int) {
+
+    permissions.forEach {
+        if (ActivityCompat.checkSelfPermission(
+                activity,
+                it
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            ActivityCompat.requestPermissions(activity, permissions, permission_code)
+        }
     }
 }
 
 
-fun showAlertBox(context: Activity, function: (string:String) -> Unit){
+fun showAlertBox(context: Activity, function: (string: String) -> Unit) {
     val alert: AlertDialog.Builder = AlertDialog.Builder(context)
     alert.setTitle("Enter device id")
     alert.setMessage("you can only set device id once")
@@ -103,7 +118,7 @@ fun showAlertBox(context: Activity, function: (string:String) -> Unit){
     alert.show()
 }
 
-fun download(context: Context,s: String): Long {
+fun download(context: Context, s: String): Long {
     val dmr = DownloadManager.Request(Uri.parse(s))
     //Alternative if you don't know filename
     val fileName: String =
@@ -117,7 +132,7 @@ fun download(context: Context,s: String): Long {
     return manager.enqueue(dmr)
 }
 
-fun deleteFile(context: Context,file: File): Boolean {
+fun deleteFile(context: Context, file: File): Boolean {
     var deleted: Boolean
     //Delete from Android Medialib, for consistency with device MTP storing and other apps listing content:// media
     if (file.isDirectory) {
@@ -129,7 +144,8 @@ fun deleteFile(context: Context,file: File): Boolean {
         deleted = try {
             cr.delete(
                 MediaStore.Files.getContentUri("external"),
-                MediaStore.Files.FileColumns.DATA + "=?", arrayOf(file.path)) > 0
+                MediaStore.Files.FileColumns.DATA + "=?", arrayOf(file.path)
+            ) > 0
         } catch (ignored: IllegalArgumentException) {
             false
         } catch (ignored: SecurityException) {
@@ -139,4 +155,18 @@ fun deleteFile(context: Context,file: File): Boolean {
         if (file.exists()) deleted = deleted or file.delete()
     }
     return deleted
+}
+
+fun BroadcastReceiver.goAsync(
+    context: CoroutineContext = EmptyCoroutineContext,
+    block: suspend CoroutineScope.() -> Unit
+) {
+    val pendingResult = goAsync()
+    CoroutineScope(SupervisorJob()).launch(context) {
+        try {
+            block()
+        } finally {
+            pendingResult.finish()
+        }
+    }
 }

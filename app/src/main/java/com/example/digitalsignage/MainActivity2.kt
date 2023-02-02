@@ -7,11 +7,13 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.net.Uri
+import android.os.Build
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.webkit.URLUtil
 import android.widget.Toast
 import androidx.activity.viewModels
+import androidx.annotation.RequiresApi
 import androidx.core.net.toFile
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
@@ -44,7 +46,7 @@ class MainActivity2 : AppCompatActivity() {
     private var job: Job? = null
 
     private val onDownloadComplete: BroadcastReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
+        override fun onReceive(context: Context, intent: Intent) = goAsync {
             val reference = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, 0)
             CheckDwnloadStatus(this@MainActivity2, reference) { uri ->
                 currentFileList.apply {
@@ -54,7 +56,7 @@ class MainActivity2 : AppCompatActivity() {
                     file?.let {
                         it.fileUri = uri.toString()
                         it.isDownloaded = true
-                        viewModel.updateCampaignFile(file)
+                        viewModel.updateCampaignDetails(file)
                     }
                 }
                 currentDownloadFileList.apply {
@@ -64,7 +66,7 @@ class MainActivity2 : AppCompatActivity() {
                     file?.let {
                         it.fileUri = uri.toString()
                         it.isDownloaded = true
-                        viewModel.updateDefaultFile(file)
+                        viewModel.updateDefaultFileDetails(file)
                     }
                 }
             }
@@ -123,6 +125,7 @@ class MainActivity2 : AppCompatActivity() {
         viewModel.playDefaultImages(this, dbList)
     }
 
+    @RequiresApi(Build.VERSION_CODES.R)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMain2Binding.inflate(layoutInflater)

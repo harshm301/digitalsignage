@@ -146,25 +146,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
 
-    fun updateCampaignFile(file: CampaignFile?) {
-        viewModelScope.launch {
-            file?.let { signageRepository.updateCampaignFile(it) }
-        }
-    }
-
     suspend fun updateCampaignDetails(file: CampaignFile) {
         signageRepository.updateCampaignFile(file)
     }
 
-
     suspend fun updateDefaultFileDetails(file: DefaultList?) {
         file?.let { signageRepository.updateDefaultFile(it) }
-    }
-
-    fun updateDefaultFile(file: DefaultList?) {
-        viewModelScope.launch {
-            file?.let { signageRepository.updateDefaultFile(it) }
-        }
     }
 
     suspend fun fetchCurrentCampaign(startTime: CurrentCampaign): List<CampaignFile> {
