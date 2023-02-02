@@ -12,7 +12,6 @@ import android.database.Cursor
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
-import android.provider.MediaStore
 import android.text.Editable
 import android.util.Log
 import android.webkit.MimeTypeMap
@@ -132,29 +131,15 @@ fun download(context: Context, s: String): Long {
     return manager.enqueue(dmr)
 }
 
-fun deleteFile(context: Context, file: File): Boolean {
-    var deleted: Boolean
-    //Delete from Android Medialib, for consistency with device MTP storing and other apps listing content:// media
-    if (file.isDirectory) {
-        deleted = true
-        for (child in file.listFiles()) deleted = deleted and deleteFile(context, child)
-        if (deleted) deleted = deleted and file.delete()
-    } else {
-        val cr = context.contentResolver
-        deleted = try {
-            cr.delete(
-                MediaStore.Files.getContentUri("external"),
-                MediaStore.Files.FileColumns.DATA + "=?", arrayOf(file.path)
-            ) > 0
-        } catch (ignored: IllegalArgumentException) {
-            false
-        } catch (ignored: SecurityException) {
-            false
+fun deleteFile(context: Context, uri: Uri) {
+    val file = File(uri.getPath())
+    file.delete()
+    if (file.exists()) {
+        file.canonicalFile.delete()
+        if (file.exists()) {
+            context.applicationContext.deleteFile(file.name)
         }
-        // Can happen on some devices...
-        if (file.exists()) deleted = deleted or file.delete()
     }
-    return deleted
 }
 
 fun BroadcastReceiver.goAsync(

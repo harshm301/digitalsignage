@@ -301,12 +301,12 @@ class MainActivity2 : AppCompatActivity() {
         val downloadedFiles = viewModel.getAllDownloadedFiles()
         list.forEach {
             it.fileUri?.let { string ->
-                deleteFile(this, File(Uri.parse(string).path))
+                deleteFile(this, uri = Uri.parse(string))
             }
         }
         downloadedFiles.forEach {
             it.fileUri?.let { string ->
-                deleteFile(this, File(Uri.parse(string).path))
+                deleteFile(this, uri = Uri.parse(string))
             }
         }
         viewModel.deleteAllCampaign()
