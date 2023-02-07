@@ -24,6 +24,8 @@
         android:requestLegacyExternalStorage="true"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
+        android:largeHeap="true"
+        android:hardwareAccelerated="false"
         android:theme="@style/Theme.DigitalSignage"
         android:usesCleartextTraffic="true"
         tools:targetApi="31">
