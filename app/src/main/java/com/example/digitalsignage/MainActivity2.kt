@@ -8,13 +8,13 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.net.Uri
 import android.os.Build
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.os.Environment
 import android.webkit.URLUtil
 import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.annotation.RequiresApi
-import androidx.core.net.toFile
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import com.example.digitalsignage.databinding.ActivityMain2Binding
@@ -25,10 +25,11 @@ import io.paperdb.Paper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import java.io.File
 import java.time.Instant
 import java.time.OffsetDateTime
+import java.time.format.DateTimeFormatter
 import java.util.*
+
 
 class MainActivity2 : AppCompatActivity() {
 
@@ -40,9 +41,8 @@ class MainActivity2 : AppCompatActivity() {
     private var DeviceId = "DeviceId"
     private var currentFileList = mutableListOf<CampaignFile>()
     private var currentDownloadFileList = mutableListOf<DefaultList>()
-    private var currentCampaign: CurrentCampaign? = null
+    private var currentCampaign: String? = null
     private var deviceId = Paper.book().read<String>(DeviceId)
-    private var addedCampaignListener = false
     private var job: Job? = null
 
     private val onDownloadComplete: BroadcastReceiver = object : BroadcastReceiver() {
@@ -70,27 +70,27 @@ class MainActivity2 : AppCompatActivity() {
                     }
                 }
             }
-            addCampaignLisener()
         }
     }
 
     private fun addCampaignLisener() {
-        if (addedCampaignListener.not()) {
-            if (deviceId != null) {
-                addedCampaignListener = true
-                database.child("user").child(deviceId!!).child("current_campaign")
-                    .addValueEventListener(object : ValueEventListener {
-                        override fun onDataChange(snapshot: DataSnapshot) {
-                            currentCampaign = snapshot.getValue(CurrentCampaign::class.java)
-                            startPlayingCampaigns()
+        deviceId?.let {
+            database.child("user").child(it).child("currentCampaign")
+                .addValueEventListener(object : ValueEventListener {
+                    override fun onDataChange(snapshot: DataSnapshot) {
+                        currentCampaign = snapshot.getValue(String::class.java)
+                        startPlayingCampaigns()
+                    }
+
+                    override fun onCancelled(error: DatabaseError) {
+                        lifecycleScope.launch(Dispatchers.Main) {
+                            Toast.makeText(this@MainActivity2, error.message, Toast.LENGTH_SHORT)
+                                .show()
                         }
 
-                        override fun onCancelled(error: DatabaseError) {
+                    }
 
-                        }
-
-                    })
-            }
+                })
         }
     }
 
@@ -101,10 +101,9 @@ class MainActivity2 : AppCompatActivity() {
             try {
                 val currentTimeStamp = Instant.now().toEpochMilli()
                 currentCampaign?.let {
-                    val startTime = OffsetDateTime.parse(it.startTime).toInstant().toEpochMilli()
-                    val end = OffsetDateTime.parse(it.endTime).toInstant().toEpochMilli()
                     val dbList = viewModel.fetchCurrentCampaign(it)
-                    if (startTime < currentTimeStamp && end > currentTimeStamp && dbList.isNotEmpty()) {
+                    if (dbList.isNotEmpty()) {
+                        val end = OffsetDateTime.parse(dbList[0].endTime).toInstant().toEpochMilli()
                         viewModel.playImageAndVideo(this@MainActivity2, dbList, end)
                     } else {
                         val list = viewModel.fetchDownloadedDefaultImages()
@@ -142,12 +141,11 @@ class MainActivity2 : AppCompatActivity() {
                 showAlertBox(this) {
                     pushDeviceIdToFirebase(it)
                 }
-            } else {
-
             }
         } catch (e: Exception) {
             Toast.makeText(this, e.message, Toast.LENGTH_SHORT).show()
         }
+        addCampaignLisener()
         observer()
     }
 
@@ -212,13 +210,14 @@ class MainActivity2 : AppCompatActivity() {
         database.child("user").updateChildren(map).addOnSuccessListener {
             deviceId = deviceId ?: toString
             setUpPlayer()
+            addCampaignLisener()
         }
     }
 
 
     private fun setUpPlayer() {
         if (deviceId != null) {
-            database.child("user").child(deviceId!!).child("campaign_file_list")
+            database.child("user").child(deviceId!!).child("campaigns")
                 .addValueEventListener(object : ValueEventListener {
                     override fun onDataChange(snapshot: DataSnapshot) {
                         println("Barcode Snapshot added")
@@ -226,6 +225,7 @@ class MainActivity2 : AppCompatActivity() {
                             val dataClassList = mutableListOf<Campaigns>()
                             snapshot.children.forEach { dataSnapshot ->
                                 dataSnapshot.getValue(Campaigns::class.java)?.let { item ->
+                                    item.campaignId = dataSnapshot.key.toString()
                                     dataClassList.add(
                                         item
                                     )
@@ -241,7 +241,7 @@ class MainActivity2 : AppCompatActivity() {
                     }
                 })
 
-            database.child("user").child(deviceId!!).child("default_list")
+            database.child("user").child(deviceId!!).child("defaultAssets")
                 .addValueEventListener(object : ValueEventListener {
                     override fun onDataChange(snapshot: DataSnapshot) {
                         println("Default Snapshot added")
@@ -297,21 +297,18 @@ class MainActivity2 : AppCompatActivity() {
 
     private suspend fun clearEverything() {
         job?.cancel()
+        showLocalImages(isFromClear = true)
         val list = viewModel.getAllCampaign()
         val downloadedFiles = viewModel.getAllDownloadedFiles()
+        val manager = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         list.forEach {
-            it.fileUri?.let { string ->
-                deleteFile(this, uri = Uri.parse(string))
-            }
+            it.downloadRefrenceId?.let { it1 -> manager.remove(it1) }
         }
         downloadedFiles.forEach {
-            it.fileUri?.let { string ->
-                deleteFile(this, uri = Uri.parse(string))
-            }
+            it.downloadRefrenceId?.let { it1 -> manager.remove(it1) }
         }
         viewModel.deleteAllCampaign()
         viewModel.deleteAllDownloadedFiles()
-        showLocalImages(isFromClear = true)
     }
 
     private fun displayFooterInfo(footerInfo: FooterInfo?) {
@@ -363,39 +360,44 @@ class MainActivity2 : AppCompatActivity() {
     }
 
     private suspend fun filterOutNewList(dataClassList: MutableList<Campaigns>) {
-        var list = viewModel.getAllCampaign().distinctBy { it.fileUrl }
+        val list = viewModel.getAllCampaign().distinctBy { it.fileUrl }
         viewModel.deleteAllCampaign()
         val common = mutableListOf<CampaignFile>()
-        list.forEach { campaingFile ->
-            val file = dataClassList.find { it.fileUrl == campaingFile.fileUrl }
-            if (file != null) {
-                campaingFile.also {
-                    it.startTime = file.startTime
-                    it.endTime = file.endTime
-                    it.fileUrl = file.fileUrl
-                    it.campaignId = file.campaignId
-                    it.order = file.order
+        dataClassList.forEach { campaign ->
+            try {
+                val startTime = Instant.from(DateTimeFormatter.ISO_OFFSET_DATE_TIME.parse(campaign.startTime))
+                val endTime = Instant.from(DateTimeFormatter.ISO_OFFSET_DATE_TIME.parse(campaign.endTime))
+                    campaign.assets.forEach { fileUrl ->
+                        val file = list.find { it.fileUrl == fileUrl.fileUrl }
+                        if (file != null) {
+                            file.also {
+                                it.startTime = campaign.startTime
+                                it.endTime = campaign.endTime
+                                it.fileUrl = fileUrl.fileUrl
+                                it.order = fileUrl.order
+                                it.campaignId = campaign.campaignId
+                            }
+                            common.add(file)
+                        } else {
+                            common.add(
+                                CampaignFile(
+                                    startTime = campaign.startTime,
+                                    endTime = campaign.endTime,
+                                    fileName = URLUtil.guessFileName(fileUrl.fileUrl, null, null),
+                                    fileUrl = fileUrl.fileUrl,
+                                    campaignId = campaign.campaignId,
+                                    order = fileUrl.order
+                                )
+                            )
+                        }
+                    }
+            } catch (e: Exception) {
+                lifecycleScope.launch(Dispatchers.Main) {
+                    Toast.makeText(this@MainActivity2, e.message, Toast.LENGTH_SHORT).show()
                 }
-                common.add(campaingFile)
             }
         }
 
-
-        val serverNewList = dataClassList.filter { campaign ->
-            common.map { it.fileUrl }.toSet().contains(campaign.fileUrl).not()
-        }
-        common.addAll(
-            serverNewList.map {
-                CampaignFile(
-                    startTime = it.startTime,
-                    endTime = it.endTime,
-                    fileName = URLUtil.guessFileName(it.fileUrl, null, null),
-                    campaignId = it.campaignId,
-                    order = it.order,
-                    fileUrl = it.fileUrl
-                )
-            }
-        )
         common.forEach {
             viewModel.updateCampaignDetails(it)
         }
@@ -429,4 +431,5 @@ class MainActivity2 : AppCompatActivity() {
             IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
         )
     }
+
 }

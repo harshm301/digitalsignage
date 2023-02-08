@@ -154,7 +154,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         file?.let { signageRepository.updateDefaultFile(it) }
     }
 
-    suspend fun fetchCurrentCampaign(startTime: CurrentCampaign): List<CampaignFile> {
+    suspend fun fetchCurrentCampaign(startTime: String): List<CampaignFile> {
         return signageRepository.fetchCurrentCampaign(startTime)
     }
 

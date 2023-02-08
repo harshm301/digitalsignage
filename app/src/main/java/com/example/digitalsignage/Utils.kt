@@ -7,6 +7,7 @@ import android.app.DownloadManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.DialogInterface
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.database.Cursor
 import android.net.Uri
@@ -18,13 +19,12 @@ import android.webkit.MimeTypeMap
 import android.webkit.URLUtil
 import android.widget.EditText
 import androidx.annotation.RequiresApi
-import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import java.io.File
 import java.io.InputStream
+import java.time.format.DateTimeParseException
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 
@@ -122,24 +122,20 @@ fun download(context: Context, s: String): Long {
     //Alternative if you don't know filename
     val fileName: String =
         URLUtil.guessFileName(s, null, MimeTypeMap.getFileExtensionFromUrl(s))
-    dmr.setTitle(fileName)
-    dmr.setDescription("Some descrition about file") //optional
-    dmr.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
+    dmr.setDestinationInExternalPublicDir(Environment.DIRECTORY_PICTURES, fileName)
     dmr.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
     dmr.setAllowedNetworkTypes(DownloadManager.Request.NETWORK_WIFI or DownloadManager.Request.NETWORK_MOBILE)
-    val manager = context.getSystemService(AppCompatActivity.DOWNLOAD_SERVICE) as DownloadManager
+    val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
     return manager.enqueue(dmr)
 }
 
 fun deleteFile(context: Context, uri: Uri) {
-    val file = File(uri.getPath())
-    file.delete()
-    if (file.exists()) {
-        file.canonicalFile.delete()
-        if (file.exists()) {
-            context.applicationContext.deleteFile(file.name)
-        }
-    }
+    val resolver = context.contentResolver
+    resolver.takePersistableUriPermission(
+        uri,
+        Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+    )
+    resolver.delete(uri, null, null)
 }
 
 fun BroadcastReceiver.goAsync(
@@ -153,5 +149,16 @@ fun BroadcastReceiver.goAsync(
         } finally {
             pendingResult.finish()
         }
+    }
+}
+
+fun isIsoDate(date: String): Boolean {
+    return try {
+
+        true
+    } catch (e: DateTimeParseException) {
+        //log the failure here
+        e.printStackTrace()
+        false
     }
 }

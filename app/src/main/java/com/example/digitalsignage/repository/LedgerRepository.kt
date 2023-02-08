@@ -14,7 +14,7 @@ class SignageRepository(appDatabase: AppDatabase) {
 
     suspend fun updateCampaignFile(campaignFile: CampaignFile) = signageDoa.insertAll(campaignFile)
 
-    suspend fun fetchCurrentCampaign(currentCampaign: CurrentCampaign) = signageDoa.getCurrentCampaign(currentCampaign.startTime,currentCampaign.endTime,currentCampaign.campaignId)
+    suspend fun fetchCurrentCampaign(currentCampaign: String) = signageDoa.getCurrentCampaign(currentCampaign)
 
     suspend fun deleteCampaigns() = signageDoa.deleteCampaigns()
 
