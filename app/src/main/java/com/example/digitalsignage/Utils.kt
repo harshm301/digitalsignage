@@ -13,6 +13,7 @@ import android.database.Cursor
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
+import android.provider.MediaStore
 import android.text.Editable
 import android.util.Log
 import android.webkit.MimeTypeMap
@@ -20,9 +21,11 @@ import android.webkit.URLUtil
 import android.widget.EditText
 import androidx.annotation.RequiresApi
 import androidx.core.app.ActivityCompat
+import androidx.core.net.toFile
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import java.io.File
 import java.io.InputStream
 import java.time.format.DateTimeParseException
 import kotlin.coroutines.CoroutineContext
@@ -122,20 +125,39 @@ fun download(context: Context, s: String): Long {
     //Alternative if you don't know filename
     val fileName: String =
         URLUtil.guessFileName(s, null, MimeTypeMap.getFileExtensionFromUrl(s))
-    dmr.setDestinationInExternalPublicDir(Environment.DIRECTORY_PICTURES, fileName)
+    dmr.setDestinationInExternalFilesDir(context,context.filesDir.absolutePath, fileName)
     dmr.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
     dmr.setAllowedNetworkTypes(DownloadManager.Request.NETWORK_WIFI or DownloadManager.Request.NETWORK_MOBILE)
     val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
     return manager.enqueue(dmr)
 }
 
-fun deleteFile(context: Context, uri: Uri) {
-    val resolver = context.contentResolver
-    resolver.takePersistableUriPermission(
-        uri,
-        Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-    )
-    resolver.delete(uri, null, null)
+fun deleteFile(context: Context,uri: Uri) {
+    try {
+        val file = File(uri.path).delete(context = context)
+        Log.d("Barcode",file.toString())
+    }catch (e:Exception){
+        Log.d("Barcode",e.message.toString())
+    }
+}
+
+fun File.delete(context: Context): Boolean {
+    var selectionArgs = arrayOf(this.absolutePath)
+    val contentResolver = context.contentResolver
+    var where: String? = null
+    var filesUri: Uri? = null
+    if (android.os.Build.VERSION.SDK_INT >= 29) {
+        filesUri = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+        where = MediaStore.Images.Media._ID + "=?"
+        selectionArgs = arrayOf(this.name)
+    } else {
+        where = MediaStore.MediaColumns.DATA + "=?"
+        filesUri = MediaStore.Files.getContentUri("external")
+    }
+
+    val int = contentResolver.delete(filesUri!!, where, selectionArgs)
+
+    return !this.exists()
 }
 
 fun BroadcastReceiver.goAsync(

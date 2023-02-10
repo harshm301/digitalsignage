@@ -10,6 +10,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
+import android.util.Log
 import android.webkit.URLUtil
 import android.widget.Toast
 import androidx.activity.viewModels
@@ -25,6 +26,7 @@ import io.paperdb.Paper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import java.io.File
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
@@ -99,14 +101,18 @@ class MainActivity2 : AppCompatActivity() {
         job?.cancel()
         job = lifecycleScope.launch(Dispatchers.IO) {
             try {
-                val currentTimeStamp = Instant.now().toEpochMilli()
                 currentCampaign?.let {
-                    val dbList = viewModel.fetchCurrentCampaign(it)
+                    val list = viewModel.fetchDownloadedDefaultImages()
+                    val dbList = viewModel.fetchCurrentCampaign(it).sortedBy { it.order }
                     if (dbList.isNotEmpty()) {
+                        val currentTimeStamp = Instant.now().toEpochMilli()
                         val end = OffsetDateTime.parse(dbList[0].endTime).toInstant().toEpochMilli()
-                        viewModel.playImageAndVideo(this@MainActivity2, dbList, end)
+                        if (end > currentTimeStamp) {
+                            viewModel.playImageAndVideo(this@MainActivity2, dbList, end)
+                        } else {
+                            showDefaultImages(list)
+                        }
                     } else {
-                        val list = viewModel.fetchDownloadedDefaultImages()
                         showDefaultImages(list)
                     }
                 }
@@ -197,16 +203,36 @@ class MainActivity2 : AppCompatActivity() {
     private fun showLocalImages(isFromClear: Boolean = false) {
         lifecycleScope.launch(Dispatchers.Main) {
             binding.ImageView.isVisible = true
-            binding.ImageView.setImageDrawable(resources.getDrawable(R.mipmap.ic_launcher))
+            binding.ImageView.setImageDrawable(resources.getDrawable(R.drawable.default_image))
         }
         if (isFromClear.not()) viewModel.restartCampaign()
     }
 
     private fun pushDeviceIdToFirebase(toString: String) {
+        Paper.book().write(DeviceId, toString)
+        database.child("user").addListenerForSingleValueEvent(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                if (snapshot.hasChild(toString).not()) {
+                    addDeviceId(toString)
+                } else {
+                    deviceId = deviceId ?: toString
+                    setUpPlayer()
+                    addCampaignLisener()
+                }
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                TODO("Not yet implemented")
+            }
+
+        })
+
+    }
+
+    private fun addDeviceId(toString: String) {
         val map = mapOf(
             toString to ""
         )
-        Paper.book().write(DeviceId, toString)
         database.child("user").updateChildren(map).addOnSuccessListener {
             deviceId = deviceId ?: toString
             setUpPlayer()
@@ -300,15 +326,21 @@ class MainActivity2 : AppCompatActivity() {
         showLocalImages(isFromClear = true)
         val list = viewModel.getAllCampaign()
         val downloadedFiles = viewModel.getAllDownloadedFiles()
+        viewModel.deleteAllCampaign()
+        viewModel.deleteAllDownloadedFiles()
         val manager = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         list.forEach {
             it.downloadRefrenceId?.let { it1 -> manager.remove(it1) }
+            //Uri.parse(it.fileUri).path?.let { it1 -> File(it1).delete() }
+            Log.d("Barcode",it.fileUri.toString())
+            it.fileUri?.let {  deleteFile(applicationContext,Uri.parse(it)) }
         }
         downloadedFiles.forEach {
             it.downloadRefrenceId?.let { it1 -> manager.remove(it1) }
+            //Uri.parse(it.fileUri).path?.let { it1 -> File(it1).delete() }
+            Log.d("Barcode",it.fileUri.toString())
+            it.fileUri?.let {  deleteFile(applicationContext,Uri.parse(it)) }
         }
-        viewModel.deleteAllCampaign()
-        viewModel.deleteAllDownloadedFiles()
     }
 
     private fun displayFooterInfo(footerInfo: FooterInfo?) {
@@ -327,23 +359,9 @@ class MainActivity2 : AppCompatActivity() {
 
 
     private suspend fun filterOutDefaultList(dataClassList: MutableList<String>) {
-        val localList = viewModel.getAllDownloadedFiles().distinctBy { it.fileUrl }
         viewModel.deleteAllDownloadedFiles()
         val common = mutableListOf<DefaultList>()
-        localList.forEach { default ->
-            val file = dataClassList.find { it == default.fileUrl }
-            if (file != null) {
-                default.also {
-                    it.fileUrl = file
-                }
-                common.add(default)
-            }
-        }
-
-        val serverNewList = dataClassList.filter { default ->
-            common.map { it.fileUrl }.toSet().contains(default).not()
-        }
-
+        val serverNewList = dataClassList.distinctBy { it }
         common.addAll(
             serverNewList.map {
                 DefaultList(
@@ -364,36 +382,47 @@ class MainActivity2 : AppCompatActivity() {
         viewModel.deleteAllCampaign()
         val common = mutableListOf<CampaignFile>()
         dataClassList.forEach { campaign ->
-            try {
-                val startTime = Instant.from(DateTimeFormatter.ISO_OFFSET_DATE_TIME.parse(campaign.startTime))
-                val endTime = Instant.from(DateTimeFormatter.ISO_OFFSET_DATE_TIME.parse(campaign.endTime))
+            if (campaign != null) {
+                try {
+                    val startTime =
+                        Instant.from(DateTimeFormatter.ISO_OFFSET_DATE_TIME.parse(campaign.startTime))
+                    val endTime =
+                        Instant.from(DateTimeFormatter.ISO_OFFSET_DATE_TIME.parse(campaign.endTime))
+
                     campaign.assets.forEach { fileUrl ->
-                        val file = list.find { it.fileUrl == fileUrl.fileUrl }
-                        if (file != null) {
-                            file.also {
-                                it.startTime = campaign.startTime
-                                it.endTime = campaign.endTime
-                                it.fileUrl = fileUrl.fileUrl
-                                it.order = fileUrl.order
-                                it.campaignId = campaign.campaignId
-                            }
-                            common.add(file)
-                        } else {
-                            common.add(
-                                CampaignFile(
-                                    startTime = campaign.startTime,
-                                    endTime = campaign.endTime,
-                                    fileName = URLUtil.guessFileName(fileUrl.fileUrl, null, null),
-                                    fileUrl = fileUrl.fileUrl,
-                                    campaignId = campaign.campaignId,
-                                    order = fileUrl.order
+                        if (fileUrl != null) {
+                            val file = list.find { it.fileUrl == fileUrl.fileUrl }
+                            if (file != null) {
+                                file.also {
+                                    it.startTime = campaign.startTime
+                                    it.endTime = campaign.endTime
+                                    it.fileUrl = fileUrl.fileUrl
+                                    it.order = fileUrl.order
+                                    it.campaignId = campaign.campaignId
+                                }
+                                common.add(file)
+                            } else {
+                                common.add(
+                                    CampaignFile(
+                                        startTime = campaign.startTime,
+                                        endTime = campaign.endTime,
+                                        fileName = URLUtil.guessFileName(
+                                            fileUrl.fileUrl,
+                                            null,
+                                            null
+                                        ),
+                                        fileUrl = fileUrl.fileUrl,
+                                        campaignId = campaign.campaignId,
+                                        order = fileUrl.order
+                                    )
                                 )
-                            )
+                            }
                         }
                     }
-            } catch (e: Exception) {
-                lifecycleScope.launch(Dispatchers.Main) {
-                    Toast.makeText(this@MainActivity2, e.message, Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    lifecycleScope.launch(Dispatchers.Main) {
+                        Toast.makeText(this@MainActivity2, e.message, Toast.LENGTH_SHORT).show()
+                    }
                 }
             }
         }
@@ -405,7 +434,7 @@ class MainActivity2 : AppCompatActivity() {
         currentFileList.addAll(common)
     }
 
-    private fun onDownload(
+    private suspend fun onDownload(
     ) {
         currentFileList.forEach {
             if (it.isDownloaded.not()) {
