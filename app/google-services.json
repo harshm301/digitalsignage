@@ -1,33 +1,41 @@
 {
   "project_info": {
-    "project_number": "1005832282480",
-    "project_id": "adtday-efed6",
-    "storage_bucket": "adtday-efed6.appspot.com"
+    "project_number": "623087266544",
+    "project_id": "adbeets-realtime-database",
+    "storage_bucket": "adbeets-realtime-database.appspot.com"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:1005832282480:android:1630910ec2819eaea66fb5",
+        "mobilesdk_app_id": "1:623087266544:android:3e8fa4c63eaada8d917035",
         "android_client_info": {
           "package_name": "com.kandala.adtday"
         }
       },
       "oauth_client": [
         {
-          "client_id": "1005832282480-j9t1dsrcp6hd48urtp355bqg0bd5ev5o.apps.googleusercontent.com",
+          "client_id": "623087266544-6hjh531096eec2p0j6pmdo0739cofihf.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.kandala.adtday",
+            "certificate_hash": "749b735948d03ddad5b6f2ddcd4322c9067291c8"
+          }
+        },
+        {
+          "client_id": "623087266544-egfljdk4ho5def0pclr4q52lkq13mc11.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyBSSFpNa4F-9Jf3Er03bLv1dUTRUMhCcdU"
+          "current_key": "AIzaSyBy2fg2VJzeSq28dKZIzoOme3JjjKEf5fQ"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "1005832282480-j9t1dsrcp6hd48urtp355bqg0bd5ev5o.apps.googleusercontent.com",
+              "client_id": "623087266544-egfljdk4ho5def0pclr4q52lkq13mc11.apps.googleusercontent.com",
               "client_type": 3
             }
           ]

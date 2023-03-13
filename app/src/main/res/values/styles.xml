@@ -2,9 +2,9 @@
 <resources>
 
     <style name="Footer_Text" parent="Widget.AppCompat.TextView">
-        <item name="android:textSize">20sp</item>
+        <item name="android:textSize">40sp</item>
         <item name="android:textStyle">normal</item>
-        <item name="fontFamily">@font/crimsontext_semibold</item>
+        <item name="fontFamily">@font/confortaa</item>
     </style>
 
 

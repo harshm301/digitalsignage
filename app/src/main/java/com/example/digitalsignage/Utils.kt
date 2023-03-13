@@ -22,6 +22,7 @@ import android.widget.EditText
 import androidx.annotation.RequiresApi
 import androidx.core.app.ActivityCompat
 import androidx.core.net.toFile
+import androidx.documentfile.provider.DocumentFile
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
@@ -125,19 +126,20 @@ fun download(context: Context, s: String): Long {
     //Alternative if you don't know filename
     val fileName: String =
         URLUtil.guessFileName(s, null, MimeTypeMap.getFileExtensionFromUrl(s))
-    dmr.setDestinationInExternalFilesDir(context,context.filesDir.absolutePath, fileName)
+    dmr.setDestinationInExternalFilesDir(context, context.cacheDir.absolutePath, fileName)
     dmr.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
     dmr.setAllowedNetworkTypes(DownloadManager.Request.NETWORK_WIFI or DownloadManager.Request.NETWORK_MOBILE)
     val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
     return manager.enqueue(dmr)
 }
 
-fun deleteFile(context: Context,uri: Uri) {
+fun deleteFile(context: Context, uri: Uri) {
     try {
+        //val file = DocumentFile.fromSingleUri(context, uri)?.delete()
         val file = File(uri.path).delete(context = context)
-        Log.d("Barcode",file.toString())
-    }catch (e:Exception){
-        Log.d("Barcode",e.message.toString())
+        Log.d("Barcode", file.toString())
+    } catch (e: Exception) {
+        Log.d("Barcode", e.message.toString())
     }
 }
 
@@ -171,16 +173,5 @@ fun BroadcastReceiver.goAsync(
         } finally {
             pendingResult.finish()
         }
-    }
-}
-
-fun isIsoDate(date: String): Boolean {
-    return try {
-
-        true
-    } catch (e: DateTimeParseException) {
-        //log the failure here
-        e.printStackTrace()
-        false
     }
 }

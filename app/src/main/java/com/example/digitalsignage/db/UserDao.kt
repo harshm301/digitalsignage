@@ -21,7 +21,7 @@ interface SignageDoa {
     @Query("Select * from campaigns where campaign_id=:campaignId and is_downloaded=1 ORDER BY :order ASC")
     suspend fun getCurrentCampaign(
         campaignId: String,
-        order:String = "order"
+        order: String = "order"
     ): List<CampaignFile>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)

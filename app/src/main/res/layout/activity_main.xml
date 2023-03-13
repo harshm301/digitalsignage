@@ -75,8 +75,7 @@
             app:layout_constraintEnd_toEndOf="parent"
             android:layout_margin="2dp"
             app:layout_constraintStart_toEndOf="@id/logo"
-            android:text="website: “https://www.adbeets.in“"
-            />
+            android:text="website: “https://www.adbeets.in“" />
 
         <androidx.appcompat.widget.AppCompatTextView
             android:id="@+id/mobilenumber"
@@ -87,8 +86,7 @@
             app:layout_constraintEnd_toEndOf="parent"
             android:layout_margin="2dp"
             app:layout_constraintStart_toEndOf="@id/logo"
-            android:text="mobile:”123456789”"
-            />
+            android:text="mobile:”123456789”" />
 
         <androidx.appcompat.widget.AppCompatTextView
             android:id="@+id/mailId"
@@ -99,8 +97,7 @@
             app:layout_constraintEnd_toEndOf="parent"
             android:layout_margin="2dp"
             app:layout_constraintStart_toEndOf="@id/logo"
-            android:text="info@adbeets.in“"
-            />
+            android:text="info@adbeets.in“" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 </LinearLayout>

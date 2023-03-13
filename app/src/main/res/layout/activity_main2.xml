@@ -4,93 +4,87 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:fitsSystemWindows="false"
+    android:animateLayoutChanges="true"
     android:orientation="vertical">
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:animateLayoutChanges="true"
-        android:background="@color/black"
+        android:layout_height="0dp"
         android:layout_weight="5"
+        android:animateLayoutChanges="true"
         tools:context=".MainActivity">
 
         <androidx.appcompat.widget.AppCompatImageView
             android:id="@+id/ImageView"
-            android:scaleType="fitXY"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:scaleType="fitXY"
             android:src="@drawable/default_image"
             android:visibility="visible" />
 
-        <VideoView
+        <com.google.android.exoplayer2.ui.StyledPlayerView
             android:id="@+id/videoView"
+            app:use_controller="false"
+            app:resize_mode="fill"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:layout_centerVertical="true"
+            android:orientation="vertical"
             android:visibility="gone" />
-
     </androidx.constraintlayout.widget.ConstraintLayout>
 
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:padding="12dp">
+        android:orientation="horizontal"
+        android:paddingEnd="8dp">
 
         <androidx.appcompat.widget.AppCompatImageView
-            android:id="@+id/logo"
-            android:layout_width="60dp"
+            android:id="@+id/logo2"
+            android:layout_width="160dp"
             android:layout_height="60dp"
-            android:src="@mipmap/ic_launcher"
-            app:layout_constraintBottom_toBottomOf="@id/mailId"
+            android:src="@drawable/product_name"
+            app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="@id/copyright" />
-
-        <androidx.appcompat.widget.AppCompatTextView
-            android:id="@+id/copyright"
-            style="@style/Footer_Text"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Copyright: @copyright Kandala Technologies Pvt Ltd"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toEndOf="@id/logo"
             app:layout_constraintTop_toTopOf="parent" />
-
-        <androidx.appcompat.widget.AppCompatTextView
-            android:id="@+id/website"
-            style="@style/Footer_Text"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            app:layout_constraintTop_toBottomOf="@id/copyright"
-            app:layout_constraintEnd_toEndOf="parent"
-            android:layout_margin="2dp"
-            app:layout_constraintStart_toEndOf="@id/logo"
-            android:text="website: “https://www.adbeets.in“"
-            />
 
         <androidx.appcompat.widget.AppCompatTextView
             android:id="@+id/mobilenumber"
             style="@style/Footer_Text"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            app:layout_constraintTop_toBottomOf="@id/website"
-            app:layout_constraintEnd_toEndOf="parent"
             android:layout_margin="2dp"
-            app:layout_constraintStart_toEndOf="@id/logo"
-            android:text="mobile:”123456789”"
-            />
+            android:gravity="center"
+            android:text="1234567890"
+            android:textColor="@color/white"
+            app:layout_constraintBottom_toBottomOf="@id/logo2"
+            app:layout_constraintEnd_toStartOf="@id/qrflow"
+            app:layout_constraintHorizontal_bias="0.4"
+            app:layout_constraintStart_toEndOf="@id/logo2"
+            app:layout_constraintTop_toTopOf="@id/logo2" />
 
-        <androidx.appcompat.widget.AppCompatTextView
-            android:id="@+id/mailId"
-            style="@style/Footer_Text"
+        <androidx.appcompat.widget.AppCompatImageView
+            android:id="@+id/qrflow"
+            android:layout_width="50dp"
+            android:layout_gravity=""
+            android:layout_height="50dp"
+            android:src="@drawable/aaja"
+            app:layout_constraintBottom_toBottomOf="@id/logo2"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="@id/logo2" />
+
+        <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             app:layout_constraintTop_toBottomOf="@id/mobilenumber"
-            app:layout_constraintEnd_toEndOf="parent"
-            android:layout_margin="2dp"
-            app:layout_constraintStart_toEndOf="@id/logo"
-            android:text="info@adbeets.in“"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="@id/mobilenumber"
+            app:layout_constraintEnd_toEndOf="@id/mobilenumber"
+            android:id="@+id/versionNumber"
+            android:textSize="10sp"
             />
+
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 </LinearLayout>

@@ -28,12 +28,12 @@ data class PlayMapper(
 )
 
 data class FooterInfo(
-    @SerializedName( "copyright")
-    val copyright:String = "",
+    @SerializedName("copyright")
+    val copyright: String = "",
     @SerializedName("mail")
-    val mail:String = "",
+    val mail: String = "",
     @SerializedName("mobile")
-    val mobile:Long = 1,
+    val mobile: Long = 1,
     @SerializedName("website")
-    val website:String = ""
+    val website: String = ""
 )

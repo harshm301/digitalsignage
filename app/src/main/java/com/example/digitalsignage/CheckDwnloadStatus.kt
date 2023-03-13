@@ -7,7 +7,12 @@ import android.database.Cursor
 import android.net.Uri
 import android.widget.Toast
 
-suspend fun CheckDwnloadStatus(context: Context, id: Long, currentFileList: suspend (uri: Uri) -> Unit) {
+suspend fun CheckDwnloadStatus(
+    context: Context,
+    id: Long,
+    sucessfullyDownload: suspend (uri: Uri) -> Unit,
+    failureInDownload: suspend (message:String) -> Unit
+) {
     // TODO Auto-generated method stub
     val downloadManager = context.getSystemService(DOWNLOAD_SERVICE) as DownloadManager
     val query = DownloadManager.Query()
@@ -40,6 +45,7 @@ suspend fun CheckDwnloadStatus(context: Context, id: Long, currentFileList: susp
                         "ERROR_UNHANDLED_HTTP_CODE"
                     DownloadManager.ERROR_UNKNOWN -> failedReason = "ERROR_UNKNOWN"
                 }
+                failureInDownload.invoke(failedReason)
             }
             DownloadManager.STATUS_PAUSED -> {
                 var pausedReason = ""
@@ -59,7 +65,7 @@ suspend fun CheckDwnloadStatus(context: Context, id: Long, currentFileList: susp
                 .show()
             DownloadManager.STATUS_SUCCESSFUL -> {
                 val uri = downloadManager.getUriForDownloadedFile(id)
-                uri?.let { currentFileList.invoke(it) }
+                uri?.let { sucessfullyDownload.invoke(it) }
             }
         }
     }
