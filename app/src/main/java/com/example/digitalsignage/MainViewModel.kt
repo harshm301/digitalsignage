@@ -40,7 +40,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _playEvent.postValue(PlayEvent.showLocalDeaulftImages)
             return
         }
-        if (indexToPlay <= currentDefaultList.size) {
+        if (indexToPlay < currentDefaultList.size) {
             val uri = Uri.parse(currentDefaultList[indexToPlay].fileUri)
             if (checkRight(context, uri)) {
                 val fileExt = MimeTypeMap.getSingleton()
@@ -69,7 +69,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun playImageAndVideo(context: Context, indexToPlay: Int) {
-        if (indexToPlay <= currentCampaignList.size) {
+        if (indexToPlay < currentCampaignList.size) {
             val itemtoPlay = currentCampaignList[indexToPlay]
             val uri = Uri.parse(itemtoPlay.fileUri)
             if (checkRight(context, uri)) {
