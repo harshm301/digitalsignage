@@ -28,22 +28,15 @@ import androidx.transition.Transition
 import androidx.transition.TransitionManager
 import com.example.digitalsignage.databinding.ActivityMain2Binding
 import com.example.digitalsignage.model.*
-import com.google.android.exoplayer2.ExoPlayer
-import com.google.android.exoplayer2.MediaItem
-import com.google.android.exoplayer2.PlaybackException
-import com.google.android.exoplayer2.Player
-import com.google.android.exoplayer2.source.MediaSource
-import com.google.android.exoplayer2.source.ProgressiveMediaSource
-import com.google.android.exoplayer2.upstream.DefaultDataSource
 import com.google.firebase.FirebaseApp
 import com.google.firebase.database.*
 import io.paperdb.Paper
+import kotlinx.android.synthetic.main.activity_main2.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.Instant
-import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 import java.util.*
 
@@ -67,7 +60,6 @@ class MainActivity2 : AppCompatActivity() {
     private var campaignFileListener: ValueEventListener? = null
     private var defaultFileListener: ValueEventListener? = null
     private var clearFlagListener: ValueEventListener? = null
-    private lateinit var dataSourceFactory: DefaultDataSource.Factory
 
     private val onDownloadComplete: BroadcastReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) = goAsync {
@@ -180,8 +172,6 @@ class MainActivity2 : AppCompatActivity() {
         }
         binding.versionNumber.text = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})"
         hideSystemUI()
-        dataSourceFactory = DefaultDataSource.Factory(this)
-        //  binding.videoView.player = simple
         observer()
 
     }
