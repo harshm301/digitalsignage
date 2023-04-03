@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import android.media.MediaMetadataRetriever
 import android.net.Uri
+import android.util.Log
 import android.webkit.MimeTypeMap
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
@@ -69,7 +70,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun playImageAndVideo(context: Context, indexToPlay: Int) {
+        Log.d("Barcode","${indexToPlay.toString()} ${currentCampaignList.size.toString()}")
         if (indexToPlay < currentCampaignList.size) {
+            Log.d("Barcode", indexToPlay.toString())
             val itemtoPlay = currentCampaignList[indexToPlay]
             val uri = Uri.parse(itemtoPlay.fileUri)
             if (checkRight(context, uri)) {

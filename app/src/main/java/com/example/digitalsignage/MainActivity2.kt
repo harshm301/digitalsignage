@@ -12,6 +12,8 @@ import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.Gravity
+import android.view.SurfaceHolder
+import android.view.SurfaceView
 import android.view.View
 import android.webkit.URLUtil
 import android.widget.Toast
@@ -65,8 +67,6 @@ class MainActivity2 : AppCompatActivity() {
     private var campaignFileListener: ValueEventListener? = null
     private var defaultFileListener: ValueEventListener? = null
     private var clearFlagListener: ValueEventListener? = null
-    private lateinit var simple: ExoPlayer
-    private lateinit var mediaSource: MediaSource
     private lateinit var dataSourceFactory: DefaultDataSource.Factory
 
     private val onDownloadComplete: BroadcastReceiver = object : BroadcastReceiver() {
@@ -137,15 +137,7 @@ class MainActivity2 : AppCompatActivity() {
                     val dbList =
                         viewModel.fetchCurrentCampaign(it).sortedBy { it.order }
                     if (dbList.isNotEmpty()) {
-                        val currentTimeStamp = Instant.now().toEpochMilli()
-                        val end =
-                            OffsetDateTime.parse(dbList[0].endTime).toInstant()
-                                .toEpochMilli()
-                        if (end > currentTimeStamp) {
-                            viewModel.playImageAndVideo(this@MainActivity2, indexToPlay = 0)
-                        } else {
-                            showDefaultImages()
-                        }
+                        viewModel.playImageAndVideo(this@MainActivity2, indexToPlay = 0)
                     } else {
                         showDefaultImages()
                     }
@@ -188,10 +180,10 @@ class MainActivity2 : AppCompatActivity() {
         }
         binding.versionNumber.text = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})"
         hideSystemUI()
-        simple = ExoPlayer.Builder(this).build()
         dataSourceFactory = DefaultDataSource.Factory(this)
-      //  binding.videoView.player = simple
+        //  binding.videoView.player = simple
         observer()
+
     }
 
     @SuppressLint("AppCompatMethod")
@@ -213,7 +205,7 @@ class MainActivity2 : AppCompatActivity() {
                             lifecycleScope.launch(Dispatchers.Main) {
                                 if (videoView.isPlaying) {
                                     videoView.stopPlayback()
-                                   // simple.clearMediaItems()
+                                    // simple.clearMediaItems()
                                 }
                                 ImageView.isVisible = false
                                 val transition = animationList.random()
