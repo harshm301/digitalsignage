@@ -26,6 +26,10 @@ import androidx.transition.Fade
 import androidx.transition.Slide
 import androidx.transition.Transition
 import androidx.transition.TransitionManager
+import com.example.digitalsignage.activity.ImageFragment
+import com.example.digitalsignage.activity.OnVideoCompleteListener
+import com.example.digitalsignage.activity.VideoFragment
+import com.example.digitalsignage.activity.onImageCompletedListener
 import com.example.digitalsignage.databinding.ActivityMain2Binding
 import com.example.digitalsignage.model.*
 import com.google.android.exoplayer2.ExoPlayer
@@ -48,7 +52,7 @@ import java.time.format.DateTimeFormatter
 import java.util.*
 
 
-class MainActivity2 : AppCompatActivity() {
+class MainActivity2 : AppCompatActivity(), onImageCompletedListener, OnVideoCompleteListener {
 
     private lateinit var binding: ActivityMain2Binding
     val viewModel: MainViewModel by viewModels()
@@ -67,8 +71,6 @@ class MainActivity2 : AppCompatActivity() {
     private var campaignFileListener: ValueEventListener? = null
     private var defaultFileListener: ValueEventListener? = null
     private var clearFlagListener: ValueEventListener? = null
-    private lateinit var dataSourceFactory: DefaultDataSource.Factory
-    private lateinit var simple:ExoPlayer
 
     private val onDownloadComplete: BroadcastReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) = goAsync {
@@ -181,7 +183,6 @@ class MainActivity2 : AppCompatActivity() {
         }
         binding.versionNumber.text = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})"
         hideSystemUI()
-        dataSourceFactory = DefaultDataSource.Factory(this)
         observer()
 
     }
@@ -203,34 +204,21 @@ class MainActivity2 : AppCompatActivity() {
                     when (playEvent) {
                         is PlayEvent.PlayImage -> {
                             lifecycleScope.launch(Dispatchers.Main) {
-                                if (videoView.isPlaying) {
-                                    videoView.stopPlayback()
-                                    // simple.clearMediaItems()
-                                }
-                                ImageView.isVisible = false
-                                val transition = animationList.random()
-                                transition.duration = 1000
-                                transition.addTarget(binding.ImageView)
-                                TransitionManager.beginDelayedTransition(
-                                    binding.root,
-                                    transition
-                                )
-                                videoView.isVisible = false
-                                ImageView.isVisible = true
                                 if (checkRight(this@MainActivity2, playEvent.uri)) {
-                                    ImageView.setImageURI(playEvent.uri)
-                                }
-                                delay(5000L)
-                                if (playEvent.isDefault.not()) {
-                                    viewModel.playImageAndVideo(
-                                        this@MainActivity2,
-                                        playEvent.nextIndex
-                                    )
-                                } else {
-                                    viewModel.playDefaultImages(
-                                        this@MainActivity2,
-                                        playEvent.nextIndex
-                                    )
+                                    binding.ImageView.isVisible = false
+                                    binding.fragmentContainer.isVisible = true
+                                    supportFragmentManager.beginTransaction().apply {
+                                        replace(
+                                            R.id.fragmentContainer,
+                                            ImageFragment.newInstance(
+                                                playEvent
+                                            ).apply {
+                                                enterTransition = Fade()
+                                            }
+                                        )
+
+                                    }.commit()
+
                                 }
                             }
 
@@ -238,92 +226,19 @@ class MainActivity2 : AppCompatActivity() {
                         is PlayEvent.PlayVideo -> {
                             lifecycleScope.launch(Dispatchers.Main) {
                                 if (checkRight(this@MainActivity2, playEvent.uri)) {
-                                    videoView.isVisible = false
-                                    ImageView.isVisible = false
-                                    val transition = animationList.random()
-                                    transition.duration = 1000
-                                    transition.addTarget(videoView)
-                                    TransitionManager.beginDelayedTransition(
-                                        binding.root,
-                                        transition
-                                    )
-                                    videoView.isVisible = true
-                                    videoView.setVideoURI(playEvent.uri)
-                                    videoView.start()
-                                    videoView.setOnCompletionListener {
-                                        if (playEvent.isDefault.not()) {
-                                            viewModel.playImageAndVideo(
-                                                this@MainActivity2,
-                                                playEvent.nextIndex
-                                            )
-                                        } else {
-                                            viewModel.playDefaultImages(
-                                                this@MainActivity2,
-                                                playEvent.nextIndex
-                                            )
-                                        }
-                                    }
-                                    videoView.setOnErrorListener { mediaPlayer, i, i2 ->
-                                        if (playEvent.isDefault.not()) {
-                                            viewModel.playImageAndVideo(
-                                                this@MainActivity2,
-                                                playEvent.nextIndex
-                                            )
-                                        } else {
-                                            viewModel.playDefaultImages(
-                                                this@MainActivity2,
-                                                playEvent.nextIndex
-                                            )
-                                        }
-                                        return@setOnErrorListener true
-                                    }
-                                }
-
-                                /* mediaSource = ProgressiveMediaSource.Factory(
-                                     dataSourceFactory
-                                 ).createMediaSource(MediaItem.fromUri(playEvent.uri))
-                                 simple.setMediaSource(mediaSource)
-                                 simple.prepare()
-                                 simple.playWhenReady = true
-                                 simple.play()*/
-                                /*simple.addListener(object : Player.Listener {
-                                    override fun onPlaybackStateChanged(playbackState: Int) {
-                                        if (playbackState == Player.STATE_ENDED) {
-                                            if (playEvent.isDefault.not()) {
-                                                viewModel.playImageAndVideo(
-                                                    this@MainActivity2,
-                                                    playEvent.nextIndex
-                                                )
-                                            } else {
-                                                viewModel.playDefaultImages(
-                                                    this@MainActivity2,
-                                                    playEvent.nextIndex
-                                                )
+                                    binding.ImageView.isVisible = false
+                                    binding.fragmentContainer.isVisible = true
+                                    supportFragmentManager.beginTransaction().apply {
+                                        replace(
+                                            R.id.fragmentContainer,
+                                            VideoFragment.newInstance(
+                                                playEvent
+                                            ).apply {
+                                                enterTransition = Fade()
                                             }
-                                        }
-                                    }
-
-                                    override fun onPlayerError(error: PlaybackException) {
-                                        super.onPlayerError(error)
-                                        reportExecptopn(error)
-                                        Toast.makeText(
-                                            this@MainActivity2,
-                                            error.message,
-                                            Toast.LENGTH_SHORT
-                                        ).show()
-                                        if (playEvent.isDefault.not()) {
-                                            viewModel.playImageAndVideo(
-                                                this@MainActivity2,
-                                                playEvent.nextIndex
-                                            )
-                                        } else {
-                                            viewModel.playDefaultImages(
-                                                this@MainActivity2,
-                                                playEvent.nextIndex
-                                            )
-                                        }
-                                    }
-                                })*/
+                                        )
+                                    }.commit()
+                                }
                             }
                         }
                         PlayEvent.RestartCampaign -> {
@@ -353,6 +268,7 @@ class MainActivity2 : AppCompatActivity() {
     private fun showLocalImages(isFromClear: Boolean = false) {
         lifecycleScope.launch(Dispatchers.Main) {
             binding.ImageView.isVisible = true
+            binding.fragmentContainer.isVisible = false
             binding.ImageView.setImageDrawable(resources.getDrawable(R.drawable.default_image))
         }
         if (isFromClear.not()) viewModel.restartCampaign()
@@ -668,6 +584,22 @@ class MainActivity2 : AppCompatActivity() {
             database.removeEventListener(it)
         }
         super.onDestroy()
+    }
+
+    override fun onImageListener(playEvent: PlayEvent.PlayImage) {
+        viewModel.playImageAndVideo(this, playEvent.nextIndex)
+    }
+
+    override fun onDefaultImageDispalyed(playEvent: PlayEvent.PlayImage) {
+        viewModel.playDefaultImages(this, playEvent.nextIndex)
+    }
+
+    override fun defaultVideoCompleted(playEvent: PlayEvent.PlayVideo) {
+        viewModel.playDefaultImages(this, playEvent.nextIndex)
+    }
+
+    override fun videoCompleted(playEvent: PlayEvent.PlayVideo) {
+        viewModel.playImageAndVideo(this, playEvent.nextIndex)
     }
 
 }

@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import android.media.MediaMetadataRetriever
 import android.net.Uri
+import android.os.Parcelable
 import android.util.Log
 import android.webkit.MimeTypeMap
 import androidx.lifecycle.AndroidViewModel
@@ -16,6 +17,7 @@ import com.example.digitalsignage.model.DefaultList
 import com.example.digitalsignage.model.ErrorBody
 import com.example.digitalsignage.repository.ErrorService
 import com.example.digitalsignage.repository.SignageRepository
+import kotlinx.android.parcel.Parcelize
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -165,11 +167,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 }
 
 sealed class PlayEvent() {
+
+    @Parcelize
     data class PlayImage(val uri: Uri, val nextIndex: Int, val isDefault: Boolean = false) :
-        PlayEvent()
+        PlayEvent(),Parcelable
+    @Parcelize
 
     data class PlayVideo(val uri: Uri, val nextIndex: Int, val isDefault: Boolean = false) :
-        PlayEvent()
+        PlayEvent(),Parcelable
 
     object RestartCampaign : PlayEvent()
 
