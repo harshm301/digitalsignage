@@ -182,6 +182,7 @@ class MainActivity2 : AppCompatActivity(), onImageCompletedListener, OnVideoComp
             Toast.makeText(this, e.message, Toast.LENGTH_SHORT).show()
         }
         binding.versionNumber.text = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})"
+        showLocalImages()
         hideSystemUI()
         observer()
 
@@ -205,37 +206,26 @@ class MainActivity2 : AppCompatActivity(), onImageCompletedListener, OnVideoComp
                         is PlayEvent.PlayImage -> {
                             lifecycleScope.launch(Dispatchers.Main) {
                                 if (checkRight(this@MainActivity2, playEvent.uri)) {
-                                    binding.ImageView.isVisible = false
-                                    binding.fragmentContainer.isVisible = true
                                     supportFragmentManager.beginTransaction().apply {
                                         replace(
                                             R.id.fragmentContainer,
                                             ImageFragment.newInstance(
                                                 playEvent
-                                            ).apply {
-                                                enterTransition = Fade()
-                                            }
+                                            )
                                         )
-
                                     }.commit()
-
                                 }
                             }
-
                         }
                         is PlayEvent.PlayVideo -> {
                             lifecycleScope.launch(Dispatchers.Main) {
                                 if (checkRight(this@MainActivity2, playEvent.uri)) {
-                                    binding.ImageView.isVisible = false
-                                    binding.fragmentContainer.isVisible = true
                                     supportFragmentManager.beginTransaction().apply {
                                         replace(
                                             R.id.fragmentContainer,
                                             VideoFragment.newInstance(
                                                 playEvent
-                                            ).apply {
-                                                enterTransition = Fade()
-                                            }
+                                            )
                                         )
                                     }.commit()
                                 }
@@ -266,11 +256,15 @@ class MainActivity2 : AppCompatActivity(), onImageCompletedListener, OnVideoComp
     }
 
     private fun showLocalImages(isFromClear: Boolean = false) {
-        lifecycleScope.launch(Dispatchers.Main) {
-            binding.ImageView.isVisible = true
-            binding.fragmentContainer.isVisible = false
-            binding.ImageView.setImageDrawable(resources.getDrawable(R.drawable.default_image))
-        }
+        supportFragmentManager.beginTransaction().apply {
+            replace(
+                R.id.fragmentContainer,
+                ImageFragment.newInstance(
+                    showDefaultImage = true
+                )
+            )
+
+        }.commit()
         if (isFromClear.not()) viewModel.restartCampaign()
     }
 

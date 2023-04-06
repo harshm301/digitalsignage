@@ -11,18 +11,9 @@
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="6"
+        android:layout_weight="5"
         android:animateLayoutChanges="true"
         tools:context=".MainActivity">
-
-
-        <androidx.appcompat.widget.AppCompatImageView
-            android:id="@+id/ImageView"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:scaleType="fitXY"
-            android:src="@drawable/default_image"
-            android:visibility="visible" />
 
         <androidx.fragment.app.FragmentContainerView
             android:id="@+id/fragmentContainer"
