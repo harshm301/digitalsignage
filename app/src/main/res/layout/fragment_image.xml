@@ -12,6 +12,4 @@
         android:scaleType="fitXY"
         android:src="@drawable/default_image"
         android:visibility="visible" />
-
-
 </FrameLayout>
